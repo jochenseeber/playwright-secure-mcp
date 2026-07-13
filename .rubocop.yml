@@ -1,0 +1,120 @@
+AllCops:
+  TargetRubyVersion: 4.0
+  NewCops: enable
+  CacheRootDirectory: <%= Dir.home %>/.cache
+Naming/FileName:
+  Exclude:
+    - "**/Gemfile"
+Layout/BeginEndAlignment:
+  EnforcedStyleAlignWith: start_of_line
+Layout/CaseIndentation:
+  EnforcedStyle: end
+  IndentOneStep: false
+Layout/DefEndAlignment:
+  AutoCorrect: true
+Layout/ElseAlignment:
+  Enabled: true
+Layout/EmptyLinesAroundAttributeAccessor:
+  Enabled: true
+Layout/EndAlignment:
+  EnforcedStyleAlignWith: start_of_line
+Layout/MultilineOperationIndentation:
+  EnforcedStyle: indented
+Layout/LineLength:
+  Max: 130
+Layout/MultilineAssignmentLayout:
+  EnforcedStyle: same_line
+Lint/AmbiguousBlockAssociation:
+  Exclude:
+    - test/**/*
+    - spec/**/*
+Lint/MixedRegexpCaptureTypes:
+  Enabled: true
+Layout/SpaceAroundMethodCallOperator:
+  Enabled: true
+Lint/DeprecatedOpenSSLConstant:
+  Enabled: true
+Lint/RaiseException:
+  Enabled: true
+Lint/StructNewOverride:
+  Enabled: true
+Lint/UnusedMethodArgument:
+  Enabled: false
+Lint/UselessAssignment:
+  AutoCorrect: false
+Lint/Void:
+  Exclude:
+    - embedded/**/*
+    - generated/**/*
+    - test/**/*
+    - spec/**/*
+Metrics/AbcSize:
+  Max: 50
+Metrics/BlockLength:
+  Exclude:
+    - "*.gemspec"
+    - generated/**/*
+    - spec/**/*
+    - test/**/*
+  Max: 100
+Metrics/ClassLength:
+  Max: 500
+Metrics/CyclomaticComplexity:
+  Max: 20
+Metrics/MethodLength:
+  Max: 50
+Metrics/ModuleLength:
+  Max: 500
+Metrics/ParameterLists:
+  Max: 10
+Metrics/PerceivedComplexity:
+  Max: 20
+Style/AccessorGrouping:
+  Enabled: false
+Style/Alias:
+  EnforcedStyle: prefer_alias_method
+Style/BlockDelimiters:
+  EnforcedStyle: line_count_based
+Style/CommandLiteral:
+  EnforcedStyle: percent_x
+Style/ExponentialNotation:
+  Enabled: true
+  EnforcedStyle: engineering
+Style/FrozenStringLiteralComment:
+  EnforcedStyle: always_true
+Style/GuardClause:
+  Enabled: false
+Style/HashEachMethods:
+  Enabled: true
+Style/HashTransformKeys:
+  Enabled: true
+Style/HashTransformValues:
+  Enabled: true
+Style/KeywordParametersOrder:
+  Enabled: false
+Style/MultilineBlockChain:
+  Enabled: false
+Layout/MultilineMethodCallIndentation:
+  EnforcedStyle: indented
+Style/Next:
+  Enabled: false
+Style/RedundantRegexpCharacterClass:
+  Enabled: true
+Style/RedundantRegexpEscape:
+  Enabled: true
+Style/RegexpLiteral:
+  EnforcedStyle: percent_r
+Style/Semicolon:
+  AllowAsExpressionSeparator: true
+Style/SlicingWithRange:
+  Enabled: true
+Style/StringLiterals:
+  EnforcedStyle: double_quotes
+Style/StringLiteralsInInterpolation:
+  EnforcedStyle: double_quotes
+Style/TrailingCommaInArrayLiteral:
+  EnforcedStyleForMultiline: consistent_comma
+Style/TrailingCommaInHashLiteral:
+  EnforcedStyleForMultiline: consistent_comma
+Style/WordArray:
+  EnforcedStyle: percent

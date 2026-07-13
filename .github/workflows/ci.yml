@@ -1,0 +1,149 @@
+name: CI
+
+on:
+  # Branch pushes and PRs run CI directly. Tag pushes do NOT (the branches
+  # filter excludes tags) — the Release workflow runs CI via workflow_call and
+  # gates the build on it, so a tag would otherwise trigger CI twice.
+  push:
+    branches:
+      - "**"
+  pull_request:
+  # Lets the Release workflow reuse this suite as a gating job.
+  workflow_call:
+
+jobs:
+  # Single source of truth for the Crystal version: shard.yml's `actions.crystal`
+  # key. Exposed as an output so the container/install-crystal jobs can pin it
+  # (job-level `container:`/`with:` are evaluated before steps, so the value must
+  # come from another job).
+  crystal-version:
+    name: Resolve Crystal version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.read.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+      - id: read
+        run: |
+          v=$(ruby -r yaml -e 'puts YAML.load_file("shard.yml").dig("actions", "crystal")')
+          test -n "$v"
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          echo "Crystal version: $v"
+
+  test-linux:
+    name: Test (Alpine ${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    # Gate tests behind Ameba: lint must pass before any test job starts.
+    needs: [crystal-version, lint]
+    # Run natively inside the Alpine (musl) image on an arch-matched runner — no
+    # docker-run/QEMU emulation on Ubuntu.
+    container: crystallang/crystal:${{ needs.crystal-version.outputs.version }}-alpine
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    steps:
+      # actions/checkout is a JavaScript action; GitHub runs it on a bundled Node
+      # binary. In an Alpine container GitHub picks the musl Node, which it ships
+      # only for x64 — never arm64 — so checkout (and every other JS action) can't
+      # run on arm64 Alpine. laverdet/alpine-arm64 installs a patched gcompat and
+      # masks /etc/os-release so GitHub falls back to the glibc Node. Must be the
+      # first step, before any JS action. https://github.com/laverdet/alpine-arm64
+      - uses: laverdet/alpine-arm64@v1
+        if: matrix.arch == 'arm64'
+
+      - uses: actions/checkout@v7
+
+      # bash: the fake_op test stubs in spec/support use a bash shebang and
+      # bash-only [[ ]] matching; Alpine ships only busybox sh, so without bash
+      # they exec-fail with 127 and every op-backed spec errors.
+      - name: Run tests in Alpine (musl)
+        run: |
+          set -eu
+          apk add --no-cache tpm2-tss-static tpm2-tss-dev openssl-libs-static bash
+          # The spec suite only needs spectator, not ameba (that's the lint job).
+          # --skip-postinstall skips building ameba; --skip-executables stops
+          # shards from then failing to install the executable it never built.
+          shards install --skip-postinstall --skip-executables
+          # No --static: `crystal spec` has no such option (it silently builds
+          # but never runs the binary). The --link-flags below still link
+          # tpm2-tss statically — Alpine's -dev package ships only the .a
+          # archives — and --start-group resolves their circular refs.
+          crystal spec \
+            --link-flags "-Wl,--start-group -ltss2-esys -ltss2-sys -ltss2-mu -ltss2-rc -ltss2-tcti-device -Wl,--end-group"
+
+  test-linux-glibc:
+    name: Test (Debian ${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    needs: [crystal-version, lint]
+    # The official Crystal image is Ubuntu-based (glibc); it reports
+    # ID_LIKE=debian, matching shard.yml's `debian` OS. The Linux TpmCipher tier
+    # links tss2 dynamically via the source's @[Link] annotations, so the dev
+    # package supplies the shared libs.
+    container: crystallang/crystal:${{ needs.crystal-version.outputs.version }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    steps:
+      - name: Install tpm2-tss
+        run: |
+          apt-get update
+          apt-get install --yes --no-install-recommends libtss2-dev
+
+      - uses: actions/checkout@v7
+
+      - name: Install dependencies
+        run: shards install
+
+      # glibc with the default linker — no mold, no link flags.
+      - name: Run tests
+        run: crystal spec
+
+  test-macos:
+    name: Test (macOS ${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    needs: [crystal-version, lint]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm64
+            runner: macos-15
+          - arch: amd64
+            runner: macos-15-intel
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: crystal-lang/install-crystal@v1
+        with:
+          crystal: ${{ needs.crystal-version.outputs.version }}
+
+      - name: Install dependencies
+        run: shards install
+
+      # macOS: Crystal auto-selects mold, which Apple's clang rejects; force
+      # Apple's ld (matches the Rakefile). The Secure Enclave spec is gated and
+      # reports `pending` on an unsigned CI binary.
+      - name: Run tests
+        run: crystal spec --link-flags=-fuse-ld=/usr/bin/ld
+
+  lint:
+    name: Ameba
+    runs-on: ubuntu-latest
+    needs: crystal-version
+    container: crystallang/crystal:${{ needs.crystal-version.outputs.version }}-alpine
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install dependencies
+        run: shards install
+      - name: Run ameba
+        run: lib/ameba/bin/ameba

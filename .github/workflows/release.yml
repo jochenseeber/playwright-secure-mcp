@@ -1,0 +1,341 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+# Release assets are named after the shard.yml build profile:
+# playwright-secure-mcp-<ostype>-<arch>-<libc>-<linkage>. The set of jobs below
+# mirrors shard.yml's `profiles:` section; keep them in sync.
+jobs:
+  # Single source of truth for both versions, read from shard.yml:
+  #   * actions.crystal — the Crystal toolchain version (pins the container image)
+  #   * version         — the project version that gets released
+  # Exposed as outputs so later jobs can pin the toolchain and publish the right
+  # version (job-level `container:`/`with:` are evaluated before steps). Also
+  # guards that the pushed tag matches shard.yml's version: shard.yml is
+  # authoritative, so bump it first and tag to match, never the other way round.
+  crystal-version:
+    name: Resolve versions & check tag
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.read.outputs.version }}
+      project: ${{ steps.read.outputs.project }}
+    steps:
+      - uses: actions/checkout@v7
+      - id: read
+        run: |
+          set -euo pipefail
+          v=$(ruby -r yaml -e 'puts YAML.load_file("shard.yml").dig("actions", "crystal")')
+          test -n "$v"
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          echo "Crystal version: $v"
+
+          project=$(ruby -r yaml -e 'puts YAML.load_file("shard.yml").fetch("version")')
+          test -n "$project"
+          echo "project=$project" >> "$GITHUB_OUTPUT"
+          echo "Project version: $project"
+
+          tag="${GITHUB_REF_NAME#v}"
+          if [ "$tag" != "$project" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME (${tag}) does not match shard.yml version ${project}. Bump shard.yml and re-tag." >&2
+            exit 1
+          fi
+
+  # Gate the release on the full CI suite (Ameba + every platform test) passing
+  # for this tag's commit. The build/publish jobs below `needs: ci`, so nothing
+  # is built or published unless CI is green.
+  ci:
+    name: CI
+    uses: ./.github/workflows/ci.yml
+
+  # Static musl binaries built natively inside the official Crystal Alpine image
+  # on an arch-matched runner (no docker run). tpm2-tss's static libraries come
+  # from Alpine's `tpm2-tss-static` package (community); tss2 uses OpenSSL for
+  # crypto, so the static libcrypto/libssl come from `openssl-libs-static`.
+  # --start-group resolves the tss2 libs' inter-deps regardless of order (static
+  # linking needs them listed explicitly, unlike the @[Link] annotations that
+  # suffice for dynamic builds). actions/checkout and actions/upload-artifact are
+  # JavaScript actions; GitHub picks the musl Node in an Alpine container but
+  # ships it only for x64 — never arm64 — so on arm64 laverdet/alpine-arm64
+  # patches gcompat and masks /etc/os-release to fall back to the glibc Node.
+  build-linux-musl:
+    name: Build linux-${{ matrix.arch }}-musl-static
+    runs-on: ${{ matrix.runner }}
+    needs: [crystal-version, ci]
+    container: crystallang/crystal:${{ needs.crystal-version.outputs.version }}-alpine
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    env:
+      PROFILE: linux-${{ matrix.arch }}-musl-static
+    steps:
+      # laverdet must run before any JS action (checkout/upload-artifact below).
+      - uses: laverdet/alpine-arm64@v1
+        if: matrix.arch == 'arm64'
+
+      - uses: actions/checkout@v7
+
+      - name: Build static release binary
+        run: |
+          set -eu
+          mkdir -p dist
+          # file: for the static sanity-check below (not in the base image).
+          apk add --no-cache tpm2-tss-static tpm2-tss-dev openssl-libs-static file
+          # --production: release needs no dev deps; also skips the ameba
+          # postinstall build that crashes under musl.
+          shards install --production
+          # =form is required: shards build delegates build_options to crystal
+          # build by splitting on spaces, so a separate-arg value ("--output X")
+          # is misread as a build target. --output=X / --link-flags=X keep them
+          # as single tokens.
+          shards build playwright-secure-mcp --release --static \
+            --output="dist/playwright-secure-mcp-$PROFILE" \
+            --link-flags="-Wl,--start-group -ltss2-esys -ltss2-sys -ltss2-mu -ltss2-rc -ltss2-tcti-device -Wl,--end-group"
+
+      - name: Sanity-check the binary is static
+        run: |
+          bin="dist/playwright-secure-mcp-$PROFILE"
+          file "$bin"
+          ldd "$bin" 2>&1 | grep -q "Not a valid dynamic program\|statically linked\|not a dynamic executable" \
+            || echo "WARNING: binary may not be fully static"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: playwright-secure-mcp-${{ env.PROFILE }}
+          path: dist/playwright-secure-mcp-${{ env.PROFILE }}
+
+  # Dynamically-linked glibc binaries built in the official Crystal image
+  # (Ubuntu-based; reports ID_LIKE=debian, matching shard.yml's `debian` OS).
+  # The tss2 libs are pulled in dynamically via the source's @[Link] annotations,
+  # so only the shared dev package is needed and no explicit link flags. These
+  # are release-only downloads; the Homebrew formula uses the musl-static binary.
+  build-linux-glibc:
+    name: Build linux-${{ matrix.arch }}-glibc-dynamic
+    runs-on: ${{ matrix.runner }}
+    needs: [crystal-version, ci]
+    container: crystallang/crystal:${{ needs.crystal-version.outputs.version }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    env:
+      PROFILE: linux-${{ matrix.arch }}-glibc-dynamic
+    steps:
+      - name: Install tpm2-tss
+        run: |
+          apt-get update
+          apt-get install --yes --no-install-recommends libtss2-dev
+
+      - uses: actions/checkout@v7
+
+      - name: Install dependencies
+        run: shards install
+
+      - name: Build dynamic release binary
+        run: |
+          mkdir -p dist
+          # =form: shards build reads a space-separated value as a build target.
+          shards build playwright-secure-mcp --release \
+            --output="dist/playwright-secure-mcp-$PROFILE"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: playwright-secure-mcp-${{ env.PROFILE }}
+          path: dist/playwright-secure-mcp-${{ env.PROFILE }}
+
+  # Signed, dynamically-linked binaries on native macOS runners. The Developer
+  # ID certificate is imported from secrets into a temporary keychain so
+  # `rake build` can codesign non-interactively (Secure Enclave requires a real
+  # Team-ID signature). Requires these repo secrets:
+  #   MACOS_CERTIFICATE_P12_BASE64  base64 of the Developer ID .p12 export
+  #   MACOS_CERTIFICATE_PASSWORD    password for that .p12
+  #   MACOS_KEYCHAIN_PASSWORD       any password for the temporary keychain
+  #   MACOS_SIGN_IDENTITY           e.g. "Developer ID Application: Name (TEAMID)"
+  #   MACOS_NOTARY_API_KEY_P8       base64 of the App Store Connect API key (.p8)
+  #   MACOS_NOTARY_KEY_ID           the API key's Key ID
+  #   MACOS_NOTARY_ISSUER_ID        the App Store Connect API Issuer ID
+  build-macos:
+    name: Build darwin-${{ matrix.arch }}-system-dynamic
+    runs-on: ${{ matrix.runner }}
+    needs: [crystal-version, ci]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm64
+            runner: macos-15
+          - arch: amd64
+            runner: macos-15-intel
+    env:
+      PROFILE: darwin-${{ matrix.arch }}-system-dynamic
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: crystal-lang/install-crystal@v1
+        with:
+          crystal: ${{ needs.crystal-version.outputs.version }}
+
+      - name: Import Developer ID certificate
+        env:
+          CERT_P12_BASE64: ${{ secrets.MACOS_CERTIFICATE_P12_BASE64 }}
+          CERT_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.MACOS_KEYCHAIN_PASSWORD }}
+        run: |
+          set -euo pipefail
+          keychain="$RUNNER_TEMP/build.keychain-db"
+          printf '%s' "$CERT_P12_BASE64" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$keychain"
+          security import "$RUNNER_TEMP/cert.p12" -k "$keychain" -P "$CERT_PASSWORD" \
+            -T /usr/bin/codesign -T /usr/bin/security
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" "$keychain"
+          security list-keychains -d user -s "$keychain" login.keychain-db
+          rm -f "$RUNNER_TEMP/cert.p12"
+
+      - name: Install dependencies
+        run: shards install
+
+      - name: Build and sign release binary
+        env:
+          CODESIGN_IDENTITY: ${{ secrets.MACOS_SIGN_IDENTITY }}
+        run: rake "build[release,$PROFILE]"
+
+      - name: Stage binary
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          cp "bin/$PROFILE-release/playwright-secure-mcp" "dist/playwright-secure-mcp-$PROFILE"
+
+      - name: Notarize
+        env:
+          CODESIGN_IDENTITY: ${{ secrets.MACOS_SIGN_IDENTITY }}
+          NOTARY_API_KEY_P8: ${{ secrets.MACOS_NOTARY_API_KEY_P8 }}
+          NOTARY_KEY_ID: ${{ secrets.MACOS_NOTARY_KEY_ID }}
+          NOTARY_ISSUER_ID: ${{ secrets.MACOS_NOTARY_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+          bin="dist/playwright-secure-mcp-$PROFILE"
+          # Notarization requires the hardened runtime and a secure timestamp;
+          # re-sign with both (rake build signs without them for local use). The
+          # entitlements allow PCRE2's regex JIT to allocate executable memory
+          # under the hardened runtime — without them the binary aborts at
+          # startup with "Regex JIT compile error: NOMEMORY".
+          codesign --force --options runtime --timestamp \
+            --entitlements deploy/macos/entitlements.plist \
+            --sign "$CODESIGN_IDENTITY" "$bin"
+          codesign --verify --strict --verbose=2 "$bin"
+          # Materialize the App Store Connect API key from its base64 secret.
+          key="$RUNNER_TEMP/AuthKey_${NOTARY_KEY_ID}.p8"
+          printf '%s' "$NOTARY_API_KEY_P8" | base64 --decode > "$key"
+          # notarytool needs an archive: submit a zip of the binary and wait for
+          # Apple's verdict (non-zero exit if rejected).
+          ditto -c -k --keepParent "$bin" "$bin.zip"
+          xcrun notarytool submit "$bin.zip" \
+            --key "$key" \
+            --key-id "$NOTARY_KEY_ID" \
+            --issuer "$NOTARY_ISSUER_ID" \
+            --wait
+          rm -f "$bin.zip" "$key"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: playwright-secure-mcp-${{ env.PROFILE }}
+          path: dist/playwright-secure-mcp-${{ env.PROFILE }}
+
+  release:
+    name: Publish GitHub release
+    needs: [build-linux-musl, build-linux-glibc, build-macos]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v8
+        with:
+          path: artifacts
+
+      - name: Publish release with binaries
+        uses: softprops/action-gh-release@v3
+        with:
+          files: artifacts/**/playwright-secure-mcp-*
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+
+  # Fill the Homebrew formula template (deploy/homebrew/) with the released
+  # version and each binary's SHA256, then publish it to the separate Homebrew
+  # tap repo so `brew install` picks it up. The formula is NOT committed back to
+  # this project — the tap repo is its only home. Only the formula's binaries
+  # (musl-static + system-dynamic) are downloaded; update_formula aborts on an
+  # asset it has no url for, so the release-only glibc-dynamic binaries are
+  # deliberately excluded. Requires the repo secret:
+  #   HOMEBREW_TAP_DEPLOY_KEY  SSH private key whose public key is a write deploy
+  #                            key on jochenseeber/homebrew-tap
+  update-formula:
+    name: Update Homebrew formula
+    needs: [release, crystal-version]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Download Linux musl-static artifacts
+        uses: actions/download-artifact@v8
+        with:
+          path: artifacts
+          pattern: playwright-secure-mcp-linux-*-musl-static
+
+      - name: Download macOS system-dynamic artifacts
+        uses: actions/download-artifact@v8
+        with:
+          path: artifacts
+          pattern: playwright-secure-mcp-darwin-*-system-dynamic
+
+      - name: Update formula with version and checksums
+        run: |
+          set -euo pipefail
+          version="${{ needs.crystal-version.outputs.project }}"
+          rake "update_formula[$version,artifacts]"
+
+      # Publish the finalized formula to the dedicated tap repo (over SSH with a
+      # deploy key), so users install via
+      # `brew install jochenseeber/tap/playwright-secure-mcp`.
+      - name: Publish formula to Homebrew tap
+        env:
+          TAP_DEPLOY_KEY: ${{ secrets.HOMEBREW_TAP_DEPLOY_KEY }}
+        run: |
+          set -euo pipefail
+          version="${{ needs.crystal-version.outputs.project }}"
+          mkdir -p ~/.ssh
+          printf '%s\n' "$TAP_DEPLOY_KEY" > ~/.ssh/tap_deploy_key
+          chmod 600 ~/.ssh/tap_deploy_key
+          ssh-keyscan github.com >> ~/.ssh/known_hosts 2>/dev/null
+          export GIT_SSH_COMMAND="ssh -i ~/.ssh/tap_deploy_key -o IdentitiesOnly=yes"
+          git clone --depth 1 git@github.com:jochenseeber/homebrew-tap.git tap
+          mkdir -p tap/Formula
+          cp deploy/homebrew/playwright-secure-mcp.rb tap/Formula/playwright-secure-mcp.rb
+          cd tap
+          # Stage first, then check the staged diff: `git diff --quiet` alone
+          # ignores untracked files, so a brand-new Formula/ file (the tap starts
+          # empty) reads as "no change" and the formula never gets pushed.
+          git add Formula/playwright-secure-mcp.rb
+          if git diff --cached --quiet; then
+            echo "Tap already up to date"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "playwright-secure-mcp ${version}"
+          git push origin HEAD

@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+if [ "$1" = "read" ]; then
+  shift
+  account=""
+  if [ "$1" = "--account" ]; then account="$2"; shift 2; fi
+  printf 'ref=%s account=%s token=%s\n' "$1" "$account" "${OP_SERVICE_ACCOUNT_TOKEN:-}"
+  exit 0
+fi
+exit 1

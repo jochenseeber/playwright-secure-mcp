@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# Fake `op` CLI for AccountLocator specs. Supports:
+#   op account list --format=json
+if [ "$1" = "account" ] && [ "$2" = "list" ]; then
+  printf '[{"account_uuid":"AAAA1111","email":"git@example.com","url":"my.1password.com","user_uuid":"u1"},{"account_uuid":"BBBB2222","email":"work@example.com","url":"work.1password.com","user_uuid":"u2"}]\n'
+  exit 0
+fi
+exit 1

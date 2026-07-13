@@ -1,0 +1,75 @@
+{
+    "[crystal]": {
+        "editor.tabSize": 2
+    },
+    "[erb]": {
+        "editor.defaultFormatter": "aliariff.vscode-erb-beautify"
+    },
+    "[json]": {
+        "editor.defaultFormatter": "dprint.dprint"
+    },
+    "[jsonc]": {
+        "editor.defaultFormatter": "dprint.dprint"
+    },
+    "[markdown]": {
+        "editor.defaultFormatter": "dprint.dprint",
+        "editor.formatOnSave": true,
+        "editor.rulers": [
+            80
+        ],
+        "editor.wordWrapColumn": 79,
+        "rewrap.wrappingColumn": 75
+    },
+    "[plaintext]": {
+        "editor.rulers": [
+            80
+        ],
+        "editor.wordWrapColumn": 79,
+        "rewrap.wrappingColumn": 79
+    },
+    "[ruby]": {
+        "editor.defaultFormatter": "rubocop.vscode-rubocop",
+        "editor.detectIndentation": false,
+        "editor.formatOnSaveMode": "file",
+        "editor.tabSize": 2
+    },
+    "[yaml]": {
+        "editor.defaultFormatter": "dprint.dprint",
+        "editor.tabSize": 2
+    },
+    "claudeCode.preferredLocation": "sidebar",
+    "editor.detectIndentation": false,
+    "editor.formatOnSave": true,
+    "editor.formatOnSaveMode": "modificationsIfAvailable",
+    "editor.insertSpaces": true,
+    "editor.rulers": [
+        130
+    ],
+    "editor.tabSize": 4,
+    "editor.useTabStops": false,
+    "editor.wordWrapColumn": 130,
+    "files.encoding": "utf8",
+    "files.eol": "\n",
+    "files.insertFinalNewline": true,
+    "files.trimFinalNewlines": true,
+    "files.trimTrailingWhitespace": true,
+    "json.schemaDownload.trustedDomains": {
+        "https://dprint.dev/": true,
+        "https://dprint.dev/schemas/v0.json": true,
+        "https://json-schema.org/": true,
+        "https://json.schemastore.org/": true,
+        "https://raw.githubusercontent.com/microsoft/vscode/": true,
+        "https://schemastore.azurewebsites.net/": true,
+        "https://www.schemastore.org/": true
+    },
+    "markdownlint.ignore": [
+        "**/.serena/**"
+    ],
+    "rdbg.rubyVersionManager": "rbenv",
+    "redhat.telemetry.enabled": false,
+    "rubocop.mode": "enableViaGemfile",
+    "rubyLsp.formatter": "rubocop",
+    "rubyLsp.rubyVersionManager": {
+        "identifier": "rbenv"
+    }
+}

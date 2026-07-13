@@ -1,0 +1,9 @@
+# Pitfalls (hard-won)
+
+- **macOS linker**: mold cannot link on macOS and Crystal auto-adds `-fuse-ld=mold` if mold is on PATH, breaking every link. Rake forces `--link-flags=-fuse-ld=/usr/bin/ld` (macOS only). Use `rake`, not raw `crystal`/`shards`.
+- **Secure Enclave codesign**: the enclave engages only with a real Apple Developer Team-ID signature; ad-hoc (`-`) is rejected (OSStatus -26276). `rake dist` needs `CODESIGN_IDENTITY` or a 1Password item tagged `codesign/<git-email>/release` (credential = cert SHA-1). Notarization needs hardened runtime + secure timestamp (done in CI).
+- **op app lock**: `op read`/`--reveal` (secret values) require the 1Password desktop app UNLOCKED. When locked, every op call blocks ~60s → `authorization timeout`, which looks like a code hang. Metadata (`op item list/get` without reveal) is served from cache and stays fast. Diagnose reveal-vs-metadata separately.
+- **MCP server is a compiled binary**: after `rake build`, `/mcp reconnect` reattaches to the SAME running process (stale binary). Must fully restart the server process to load new code.
+- **Proxy handlers must always answer**: an uncaught exception in a handler fiber dies silently and the client hangs forever. Real instance: `WebsiteMatcher` did `URI.parse` on 1Password login URLs; some are invalid (`http://host:4080 (label)`) → `URI::Error` aborted the handler. Fix at source (tolerate bad input) AND rescue broadly at the handler boundary.
+- **op needs the account host allowlisted** when running under the CC command sandbox: non-`my.1password.com` accounts (e.g. `caperwhite.1password.com`) hang unless the host is in `sandbox.network.allowedDomains` (`.claude/settings.json`). Not an auth failure.
+- **Crystal type-checks only instantiated code**: platform-gated FFI (`secure_enclave_cipher`, `tpm_cipher`) isn't verified without a call site / cross-compile for the target.

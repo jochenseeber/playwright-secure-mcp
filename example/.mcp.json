@@ -1,0 +1,11 @@
+{
+    "mcpServers": {
+        "playwright-secure": {
+            "command": "../bin/playwright-secure-mcp",
+            "args": [
+                "--account-from-git",
+                ".."
+            ]
+        }
+    }
+}

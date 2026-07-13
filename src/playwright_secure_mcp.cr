@@ -1,0 +1,35 @@
+require "./playwright_secure_mcp/version"
+require "./playwright_secure_mcp/package_manager"
+require "./playwright_secure_mcp/configuration"
+require "./playwright_secure_mcp/upstream_command"
+require "./playwright_secure_mcp/command_line_parser"
+require "./playwright_secure_mcp/stdio_transport"
+require "./playwright_secure_mcp/op_runner"
+require "./playwright_secure_mcp/secret_resolver"
+require "./playwright_secure_mcp/encrypted_secret"
+require "./playwright_secure_mcp/secret_cipher"
+require "./playwright_secure_mcp/aes_cbc"
+require "./playwright_secure_mcp/in_memory_cipher"
+require "./playwright_secure_mcp/cipher_selector"
+require "./playwright_secure_mcp/secure_enclave_cipher"
+require "./playwright_secure_mcp/tpm_cipher"
+require "./playwright_secure_mcp/keyring_cipher"
+require "./playwright_secure_mcp/secret_vault"
+require "./playwright_secure_mcp/redactor"
+require "./playwright_secure_mcp/secret_type_tool"
+require "./playwright_secure_mcp/secret_guard"
+require "./playwright_secure_mcp/item"
+require "./playwright_secure_mcp/website_matcher"
+require "./playwright_secure_mcp/item_locator"
+require "./playwright_secure_mcp/secret_finders"
+require "./playwright_secure_mcp/item_result"
+require "./playwright_secure_mcp/proxy"
+require "./playwright_secure_mcp/account_resolver"
+require "./playwright_secure_mcp/token_fetcher"
+require "./playwright_secure_mcp/application"
+
+module PlaywrightSecureMcp
+  def self.run(arguments : Array(String)) : Nil
+    Application.new(arguments).run
+  end
+end

@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+if [ "$1" = "read" ] && [[ "$2" == op://ok/* ]]; then
+  printf 'super-secret-value\n'
+  exit 0
+fi
+printf 'op: error resolving reference\n' >&2
+exit 1

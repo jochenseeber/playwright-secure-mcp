@@ -1,0 +1,31 @@
+name: playwright-secure-mcp
+version: 1.0.0-dev
+
+crystal: ">= 1.20.0"
+
+
+targets:
+  playwright-secure-mcp:
+    main: src/main.cr
+
+development_dependencies:
+  spectator:
+    github: icy-arctic-fox/spectator
+    version: ">= 0.12.0"
+  ameba:
+    github: crystal-ameba/ameba
+    version: ">= 1.6.0"
+
+profiles:
+  macosx:
+    - darwin-arm64-system-dynamic
+    - darwin-amd64-system-dynamic
+  alpine:
+    - linux-arm64-musl-static
+    - linux-amd64-musl-static
+  debian:
+    - linux-arm64-glibc-dynamic
+    - linux-amd64-glibc-dynamic
+
+actions:
+  crystal: "1.20.3"

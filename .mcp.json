@@ -1,0 +1,24 @@
+{
+    "mcpServers": {
+        "playwright-secure": {
+            "args": [
+                "--account-from-git",
+                "."
+            ],
+            "command": "bin/playwright-secure-mcp"
+        },
+        "serena": {
+            "args": [
+                "--from",
+                "git+https://github.com/oraios/serena",
+                "serena",
+                "start-mcp-server",
+                "--context",
+                "claude-code",
+                "--enable-web-dashboard",
+                "false"
+            ],
+            "command": "uvx"
+        }
+    }
+}

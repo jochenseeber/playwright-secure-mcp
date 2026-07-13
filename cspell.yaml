@@ -1,0 +1,19 @@
+---
+dictionaries:
+- project-dictionary
+dictionaryDefinitions:
+- addWords: true
+  name: project-dictionary
+  path: "./cspell.dict"
+ignorePaths:
+- ".claude"
+- ".git"
+- ".playwright-mcp"
+- ".serena"
+ignoreRandomStrings: true
+ignoreRegExpList:
+- "/\\\\[a-zA-Z]/g"
+- "/op:\\/\\/\\S+/g"
+language: en-US
+minRandomLength: 24
+version: '0.2'

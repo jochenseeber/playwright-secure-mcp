@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Crystal's Regex (used by e.g. OptionParser) JIT-compiles via PCRE2.
+         Under the hardened runtime, allocating executable memory is blocked
+         unless the binary is entitled, which otherwise crashes at startup with
+         "Regex JIT compile error: NOMEMORY". allow-jit covers arm64 (MAP_JIT);
+         allow-unsigned-executable-memory covers x86_64 (RWX mmap). -->
+    <key>com.apple.security.cs.allow-jit</key>
+    <true/>
+    <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+    <true/>
+</dict>
+</plist>

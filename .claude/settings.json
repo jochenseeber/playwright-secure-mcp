@@ -1,0 +1,80 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:api.github.com)",
+      "mcp__plugin_claude-mem_mcp-search__get_observations"
+    ]
+  },
+  "enabledPlugins": {
+    "claude-code-setup@claude-plugins-official": true,
+    "claude-md-management@claude-plugins-official": true,
+    "code-simplifier@claude-plugins-official": true,
+    "context7@claude-plugins-official": true,
+    "ralph-loop@claude-plugins-official": true,
+    "serena@claude-plugins-official": true,
+    "superpowers@claude-plugins-official": true
+  },
+  "sandbox": {
+    "enabled": true,
+    "failIfUnavailable": true,
+    "allowUnsandboxedCommands": false,
+    "network": {
+      "allowedDomains": [
+        "caperwhite.1password.com",
+        "codeload.github.com",
+        "files.pythonhosted.org",
+        "github.com",
+        "objects.githubusercontent.com",
+        "pypi.org"
+      ],
+      "allowUnixSockets": [
+        "~/Library/Group Containers/2BUA8C4S2C.com.1password/t/agent.sock",
+        "~/Library/Group Containers/2BUA8C4S2C.com.1password/t/s.sock"
+      ],
+      "allowAllUnixSockets": true,
+      "allowMachLookup": [
+        "2BUA8C4S2C.com.1password.*",
+        "com.1password.*",
+        "com.apple.CryptoTokenKit.*",
+        "com.apple.SecurityServer",
+        "com.apple.ctkd.*",
+        "com.apple.securityd.*",
+        "com.apple.trustd.*"
+      ]
+    },
+    "filesystem": {
+      "allowWrite": [
+        "~/.cache/crystal",
+        "~/.cache/rubocop_cache",
+        "~/.cache/uv",
+        "~/.local/share/uv",
+        "~/.serena"
+      ],
+      "denyRead": [
+        "~/"
+      ],
+      "allowRead": [
+        ".",
+        "~/.cache/crystal",
+        "~/.cache/rubocop_cache",
+        "~/.cache/uv",
+        "~/.claude",
+        "~/.config/git",
+        "~/.config/op",
+        "~/.config/vsrun",
+        "~/.gitconfig",
+        "~/.gitignore_global",
+        "~/.local/bin",
+        "~/.local/share/uv",
+        "~/.local/state/fnm_multishells",
+        "~/.rbenv",
+        "~/.serena",
+        "~/CLAUDE.md",
+        "~/Library/Caches/dprint",
+        "~/Library/Group Containers/2BUA8C4S2C.com.1password",
+        "~/Library/Keychains"
+      ]
+    },
+    "enableWeakerNetworkIsolation": true
+  }
+}
