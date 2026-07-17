@@ -8,6 +8,9 @@ module PlaywrightSecureMcp
   # under the process cipher; all other item metadata is kept in the clear.
   # Write-once per key: a re-discovered item is not refreshed until `clear`.
   class ItemCache
+    class Error < Exception
+    end
+
     def initialize(@cipher : SecretCipher = InMemoryCipher.new)
       @items = {} of ItemKey => Item
       @loose = [] of EncryptedSecret
@@ -58,7 +61,7 @@ module PlaywrightSecureMcp
     # decrypted bytes afterward. Raises if no token is stored.
     def with_service_token(& : String -> T) : T forall T
       entry = @service_token
-      raise "no service-account token stored" if entry.nil?
+      raise Error.new("no service-account token stored") if entry.nil?
       bytes = @cipher.decrypt(entry)
       begin
         yield String.new(bytes)

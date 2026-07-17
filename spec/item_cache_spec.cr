@@ -92,6 +92,6 @@ Spectator.describe PlaywrightSecureMcp::ItemCache do
   end
 
   it "raises when with_service_token is called with none stored" do
-    expect { cache.with_service_token { |_| } }.to raise_error(Exception)
+    expect { cache.with_service_token { |_| } }.to raise_error(PlaywrightSecureMcp::ItemCache::Error)
   end
 end

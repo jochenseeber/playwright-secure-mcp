@@ -17,9 +17,11 @@ done
 
 if [ "$1" = "item" ] && [ "$2" = "list" ] && [ "$category" = "Login" ]; then
   # Service-token mode: the token must arrive via the environment and
-  # --account must be omitted. Returns a distinct item id so the spec can
-  # tell this path apart from the plain (token-less) listing below.
-  if [ -n "$OP_SERVICE_ACCOUNT_TOKEN" ]; then
+  # --account must be omitted. Keyed on the spec's exact sentinel token value
+  # (not mere presence) so a real OP_SERVICE_ACCOUNT_TOKEN inherited from the
+  # dev/CI shell cannot flip the token-less specs. Returns a distinct item id
+  # so the spec can tell this path apart from the plain (token-less) listing.
+  if [ "$OP_SERVICE_ACCOUNT_TOKEN" = "tok" ]; then
     [ -n "$account" ] && exit 1
     printf '[{"id":"svc1","title":"Service","category":"LOGIN","vault":{"id":"v1"},"urls":[{"href":"https://example.com/login"}],"tags":["work"]}]\n'
     exit 0
