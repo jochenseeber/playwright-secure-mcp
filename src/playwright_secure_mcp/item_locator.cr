@@ -23,8 +23,7 @@ module PlaywrightSecureMcp
     CONCEALED_TYPE      = "CONCEALED"
     CREDENTIAL_PURPOSES = {"USERNAME", "PASSWORD"}
 
-    def initialize(*, @op_command : String, @account : String?,
-                   @service_account_token : String? = nil, @encryptor : ItemCache)
+    def initialize(*, @op_command : String, @account : String?, @encryptor : ItemCache)
     end
 
     def list_logins(vault : String?) : Array(Item)
@@ -148,16 +147,23 @@ module PlaywrightSecureMcp
       @encryptor.encrypt(value)
     end
 
+    # Runs `op` with either the service-account token decrypted transiently
+    # into the child environment (no `--account`), or `--account` when no
+    # token is stored. The plaintext token lives only for the op call.
     private def run(arguments : Array(String), *, vault : String?, input : String? = nil) : String
       argv = arguments.dup
       argv << "--vault" << vault if vault
-      if token = @service_account_token
-        env = {"OP_SERVICE_ACCOUNT_TOKEN" => token.as(String?)}
+      if @encryptor.service_token?
+        @encryptor.with_service_token do |token|
+          invoke(arguments, argv, {"OP_SERVICE_ACCOUNT_TOKEN" => token.as(String?)}, input)
+        end
       else
-        env = nil
         argv << "--account" << @account.as(String) if @account
+        invoke(arguments, argv, nil, input)
       end
+    end
 
+    private def invoke(arguments : Array(String), argv : Array(String), env : Process::Env, input : String?) : String
       stdin = input ? IO::Memory.new(input) : Process::Redirect::Close
       output = IO::Memory.new
       status =

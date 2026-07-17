@@ -54,6 +54,16 @@ Spectator.describe PlaywrightSecureMcp::ItemLocator do
     expect(items.map(&.item_id)).to eq(["login1", "login2"])
   end
 
+  it "passes the service token via the environment and omits --account" do
+    cache.store_service_token("tok")
+    token_locator = PlaywrightSecureMcp::ItemLocator.new(
+      op_command: FAKE_OP_ITEMS, account: "acct1", encryptor: cache)
+    # The fixture returns the "svc1" login only when OP_SERVICE_ACCOUNT_TOKEN
+    # is set and --account is absent, so this asserts the env-token path.
+    items = token_locator.list_logins(nil)
+    expect(items.map(&.item_id)).to eq(["svc1"])
+  end
+
   it "maps sections onto the item" do
     items = locator.reveal([PlaywrightSecureMcp::ItemKey.new(vault_id: "v1", item_id: "login1")])
     expect(items.first.sections["sec1"].label).to eq("More")

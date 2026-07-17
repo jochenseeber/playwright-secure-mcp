@@ -8,12 +8,22 @@
 #   op item get item123 --fields label=credential --reveal --format=json
 category=""
 login_tag=""
+account=""
 for ((i=1;i<=$#;i++)); do
   [ "${!i}" = "--categories" ] && { j=$((i+1)); category="${!j}"; }
   [ "${!i}" = "--tags" ] && { j=$((i+1)); login_tag="${!j}"; }
+  [ "${!i}" = "--account" ] && { j=$((i+1)); account="${!j}"; }
 done
 
 if [ "$1" = "item" ] && [ "$2" = "list" ] && [ "$category" = "Login" ]; then
+  # Service-token mode: the token must arrive via the environment and
+  # --account must be omitted. Returns a distinct item id so the spec can
+  # tell this path apart from the plain (token-less) listing below.
+  if [ -n "$OP_SERVICE_ACCOUNT_TOKEN" ]; then
+    [ -n "$account" ] && exit 1
+    printf '[{"id":"svc1","title":"Service","category":"LOGIN","vault":{"id":"v1"},"urls":[{"href":"https://example.com/login"}],"tags":["work"]}]\n'
+    exit 0
+  fi
   # The only login carries the tag "work"; honor --tags so tag narrowing is real.
   if [ -z "$login_tag" ] || [ "$login_tag" = "work" ]; then
     printf '[{"id":"login1","title":"Example","category":"LOGIN","vault":{"id":"v1"},"urls":[{"href":"https://example.com/login"}],"tags":["work"]}]\n'

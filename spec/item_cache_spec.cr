@@ -65,4 +65,33 @@ Spectator.describe PlaywrightSecureMcp::ItemCache do
     cache.each_ciphertext_for_test { |bytes| dumped << bytes.hexstring }
     expect(dumped.join.includes?("super-secret".to_slice.hexstring)).to be_false
   end
+
+  it "round-trips the service token and reports presence" do
+    expect(cache.service_token?).to be_false
+    cache.store_service_token("ops_tok_123")
+    expect(cache.service_token?).to be_true
+    seen = nil.as(String?)
+    cache.with_service_token { |token| seen = token }
+    expect(seen).to eq("ops_tok_123")
+  end
+
+  it "keeps the service token across clear and in each_plaintext" do
+    cache.store_service_token("ops_tok_123")
+    cache.clear
+    expect(cache.service_token?).to be_true
+    collected = [] of String
+    cache.each_plaintext { |secret| collected << secret }
+    expect(collected.includes?("ops_tok_123")).to be_true
+  end
+
+  it "does not keep the service token plaintext in ciphertext" do
+    cache.store_service_token("ops_tok_123")
+    dumped = [] of String
+    cache.each_ciphertext_for_test { |bytes| dumped << bytes.hexstring }
+    expect(dumped.join.includes?("ops_tok_123".to_slice.hexstring)).to be_false
+  end
+
+  it "raises when with_service_token is called with none stored" do
+    expect { cache.with_service_token { |_| } }.to raise_error(Exception)
+  end
 end

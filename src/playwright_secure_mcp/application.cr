@@ -41,14 +41,12 @@ module PlaywrightSecureMcp
       Log.info { "cache key protection: #{cipher.description}" }
       cache = ItemCache.new(cipher)
       token = fetch_token(configuration, account)
+      cache.store_service_token(token) if token
       item_locator = ItemLocator.new(
         op_command: configuration.op_command,
-        account: token ? nil : account,
-        service_account_token: token,
+        account: account,
         encryptor: cache,
       )
-      # Store the token as a loose secret so the redactor and guard cover it.
-      cache.add_loose_secret(token) if token && !token.empty?
       tokens = UpstreamCommand.new(configuration).tokens
       upstream_process = Upstream.new(tokens)
       upstream_transport = upstream_process.start

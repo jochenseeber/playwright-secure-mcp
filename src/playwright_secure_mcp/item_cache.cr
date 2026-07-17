@@ -11,6 +11,7 @@ module PlaywrightSecureMcp
     def initialize(@cipher : SecretCipher = InMemoryCipher.new)
       @items = {} of ItemKey => Item
       @loose = [] of EncryptedSecret
+      @service_token = nil.as(EncryptedSecret?)
     end
 
     def encrypt(plaintext : String) : EncryptedSecret
@@ -37,10 +38,33 @@ module PlaywrightSecureMcp
       @items.clear
     end
 
-    # Store a secret that is not part of an item (the service-account token), so
-    # the redactor and guard cover it too.
+    # Store a secret that is not part of an item, so the redactor and guard
+    # cover it too.
     def add_loose_secret(secret : String) : Nil
       @loose << @cipher.encrypt(secret.to_slice)
+    end
+
+    # Stores the 1Password service-account token encrypted at rest. The token
+    # survives `clear` and is included in `each_plaintext` for redaction.
+    def store_service_token(token : String) : Nil
+      @service_token = @cipher.encrypt(token.to_slice)
+    end
+
+    def service_token? : Bool
+      !@service_token.nil?
+    end
+
+    # Decrypts the service token for the duration of the block, zeroing the
+    # decrypted bytes afterward. Raises if no token is stored.
+    def with_service_token(& : String -> T) : T forall T
+      entry = @service_token
+      raise "no service-account token stored" if entry.nil?
+      bytes = @cipher.decrypt(entry)
+      begin
+        yield String.new(bytes)
+      ensure
+        bytes.fill(0_u8)
+      end
     end
 
     def each_plaintext(& : String ->) : Nil
@@ -62,6 +86,8 @@ module PlaywrightSecureMcp
         end
       end
       entries.concat(@loose)
+      token = @service_token
+      entries << token unless token.nil?
       entries
     end
   end
