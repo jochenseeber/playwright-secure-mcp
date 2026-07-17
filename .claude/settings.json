@@ -3,7 +3,9 @@
     "allow": [
       "WebFetch(domain:api.github.com)",
       "mcp__plugin_claude-mem_mcp-search__get_observations",
-      "mcp__playwright-secure__browser_list_items"
+      "mcp__playwright-secure__browser_list_items",
+      "mcp__playwright-secure__browser_find_items_by_name",
+      "mcp__playwright-secure__browser_find_items_by_tag"
     ]
   },
   "enabledPlugins": {

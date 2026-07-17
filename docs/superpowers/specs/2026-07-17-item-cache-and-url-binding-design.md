@@ -109,7 +109,13 @@ record Section, id : String, label : String
 ```
 
 - Only `Field#value` is encrypted (via the existing cipher). All other
-  properties are non-secret metadata stored plaintext. Valueless fields hold
+  properties are non-secret metadata stored plaintext.
+- A value is cached (encrypted) **only for credential fields** — those of type
+  `CONCEALED` or with purpose `USERNAME`/`PASSWORD`. Other fields (form
+  artifacts such as language pickers or submit buttons, and plain notes) are
+  surfaced as metadata only, with `value` `nil`. This keeps non-secret values
+  out of the redactor/guard so they can't over-redact unrelated page content,
+  and it means only credential fields are typable. Valueless fields also hold
   `nil`.
 - `Item` replaces the old lightweight identity record. `WebsiteMatcher` and
   `ItemResult` operate on it and expose only identity/URLs/tags/field-metadata

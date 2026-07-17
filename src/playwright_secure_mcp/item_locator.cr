@@ -1,4 +1,5 @@
 require "json"
+require "./encrypted_secret"
 require "./item"
 require "./item_cache"
 require "./op_runner"
@@ -12,6 +13,14 @@ module PlaywrightSecureMcp
     end
 
     LOGIN_CATEGORY = "LOGIN"
+
+    # Field types/purposes that hold an actual credential. Only these fields'
+    # values are cached (encrypted) and thus fed to the redactor and guard;
+    # other fields (form artifacts like language pickers or submit buttons)
+    # are surfaced as metadata only, so their non-secret values never trigger
+    # over-redaction of unrelated page content.
+    CONCEALED_TYPE      = "CONCEALED"
+    CREDENTIAL_PURPOSES = {"USERNAME", "PASSWORD"}
 
     def initialize(*, @op_command : String, @account : String?,
                    @service_account_token : String? = nil, @encryptor : ItemCache)
@@ -138,16 +147,26 @@ module PlaywrightSecureMcp
       (entry["fields"]?.try(&.as_a) || [] of JSON::Any).each do |raw|
         id = raw["id"]?.try(&.as_s)
         next if id.nil?
+        type = raw["type"]?.try(&.as_s) || ""
+        purpose = raw["purpose"]?.try(&.as_s)
         raw_value = raw["value"]?.try(&.as_s)
         fields[id] = Field.new(
           id: id,
           section_id: raw.dig?("section", "id").try(&.as_s),
-          type: raw["type"]?.try(&.as_s) || "",
-          purpose: raw["purpose"]?.try(&.as_s),
+          type: type,
+          purpose: purpose,
           label: raw["label"]?.try(&.as_s) || "",
-          value: (raw_value && !raw_value.empty?) ? @encryptor.encrypt(raw_value) : nil)
+          value: cache_value(type: type, purpose: purpose, value: raw_value))
       end
       fields
+    end
+
+    # Encrypts a field value only when the field holds a credential; otherwise
+    # returns nil so the value is neither typable nor redacted.
+    private def cache_value(*, type : String, purpose : String?, value : String?) : EncryptedSecret?
+      return nil if value.nil? || value.empty?
+      return nil unless type == CONCEALED_TYPE || (purpose && CREDENTIAL_PURPOSES.includes?(purpose))
+      @encryptor.encrypt(value)
     end
 
     private def key_of(entry : JSON::Any) : ItemKey

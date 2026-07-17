@@ -34,6 +34,17 @@ Spectator.describe PlaywrightSecureMcp::ItemLocator do
     expect(String.new(value.not_nil!.ciphertext)).not_to eq("pw")
   end
 
+  it "caches values only for credential fields, not form artifacts" do
+    items = locator.reveal([PlaywrightSecureMcp::ItemKey.new(vault_id: "v1", item_id: "login1")])
+    fields = items.first.fields
+    # username (USERNAME purpose) and password (CONCEALED/PASSWORD) are cached
+    expect(fields["username"].value).not_to be_nil
+    expect(fields["password"].value).not_to be_nil
+    # the plain STRING "Token" field carries no purpose -> metadata only, no value
+    expect(fields["custom"].type).to eq("STRING")
+    expect(fields["custom"].value).to be_nil
+  end
+
   it "reveals multiple login items from a concatenated op stream" do
     keys = [
       PlaywrightSecureMcp::ItemKey.new(vault_id: "v1", item_id: "login1"),
