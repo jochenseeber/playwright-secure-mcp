@@ -1,5 +1,10 @@
 require "file_utils"
 require "./spec_helper"
+require "../src/playwright_secure_mcp/item"
+require "../src/playwright_secure_mcp/item_cache"
+require "../src/playwright_secure_mcp/item_finders"
+require "../src/playwright_secure_mcp/item_locator"
+require "../src/playwright_secure_mcp/website_matcher"
 
 private FAKE_OP_ITEMS = File.expand_path("support/fake_op_items", __DIR__)
 

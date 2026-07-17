@@ -1,4 +1,5 @@
 require "./spec_helper"
+require "../src/playwright_secure_mcp/tpm_cipher"
 
 {% if flag?(:linux) %}
   Spectator.describe PlaywrightSecureMcp::TpmCipher do

@@ -1,5 +1,6 @@
 require "random/secure"
 require "./secret_cipher"
+require "./encrypted_secret"
 require "./aes_cbc"
 
 module PlaywrightSecureMcp

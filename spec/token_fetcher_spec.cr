@@ -1,4 +1,5 @@
 require "./spec_helper"
+require "../src/playwright_secure_mcp/token_fetcher"
 
 private FAKE_OP_ITEMS = File.expand_path("support/fake_op_items", __DIR__)
 

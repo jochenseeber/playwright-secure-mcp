@@ -1,4 +1,5 @@
 require "./spec_helper"
+require "../src/playwright_secure_mcp/secure_enclave_cipher"
 
 {% if flag?(:darwin) %}
   Spectator.describe PlaywrightSecureMcp::SecureEnclaveCipher do

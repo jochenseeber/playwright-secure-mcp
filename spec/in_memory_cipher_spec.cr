@@ -1,4 +1,5 @@
 require "./spec_helper"
+require "../src/playwright_secure_mcp/in_memory_cipher"
 
 Spectator.describe PlaywrightSecureMcp::InMemoryCipher do
   let(cipher) { PlaywrightSecureMcp::InMemoryCipher.new }

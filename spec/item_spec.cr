@@ -1,4 +1,5 @@
 require "./spec_helper"
+require "../src/playwright_secure_mcp/item"
 
 Spectator.describe PlaywrightSecureMcp::Item do
   it "exposes vault and item ids via its key" do

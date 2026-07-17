@@ -1,6 +1,9 @@
 require "log"
 require "./secret_cipher"
 require "./in_memory_cipher"
+require "./secure_enclave_cipher"
+require "./tpm_cipher"
+require "./keyring_cipher"
 
 module PlaywrightSecureMcp
   # A candidate cipher tier. `build` attempts to initialize the tier and raises

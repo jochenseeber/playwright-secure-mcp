@@ -1,4 +1,7 @@
 require "./spec_helper"
+require "../src/playwright_secure_mcp/encrypted_secret"
+require "../src/playwright_secure_mcp/item"
+require "../src/playwright_secure_mcp/item_result"
 
 Spectator.describe PlaywrightSecureMcp::ItemResult do
   it "serializes identity and field metadata but never values" do

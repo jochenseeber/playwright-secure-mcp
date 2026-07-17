@@ -1,4 +1,7 @@
 require "./spec_helper"
+require "../src/playwright_secure_mcp/configuration"
+require "../src/playwright_secure_mcp/package_manager"
+require "../src/playwright_secure_mcp/upstream_command"
 
 private def configuration(
   *,

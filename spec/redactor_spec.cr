@@ -1,4 +1,6 @@
 require "./spec_helper"
+require "../src/playwright_secure_mcp/item_cache"
+require "../src/playwright_secure_mcp/redactor"
 
 Spectator.describe PlaywrightSecureMcp::Redactor do
   let(cache) { PlaywrightSecureMcp::ItemCache.new }

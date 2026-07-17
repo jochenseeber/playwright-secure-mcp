@@ -1,4 +1,5 @@
 require "./spec_helper"
+require "../src/playwright_secure_mcp/account_locator"
 
 private FAKE_OP_ACCOUNTS = File.expand_path("support/fake_op_accounts", __DIR__)
 

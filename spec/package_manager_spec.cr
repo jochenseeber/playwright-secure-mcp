@@ -1,4 +1,5 @@
 require "./spec_helper"
+require "../src/playwright_secure_mcp/package_manager"
 
 Spectator.describe PlaywrightSecureMcp::PackageManager do
   it "parses known names case-insensitively" do

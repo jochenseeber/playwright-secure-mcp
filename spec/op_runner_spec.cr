@@ -1,4 +1,5 @@
 require "./spec_helper"
+require "../src/playwright_secure_mcp/op_runner"
 
 Spectator.describe PlaywrightSecureMcp::OpRunner do
   it "returns the captured output and a successful status" do

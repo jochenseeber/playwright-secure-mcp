@@ -1,4 +1,6 @@
 require "./spec_helper"
+require "../src/playwright_secure_mcp/command_line_parser"
+require "../src/playwright_secure_mcp/package_manager"
 
 Spectator.describe PlaywrightSecureMcp::CommandLineParser do
   let(parser) { PlaywrightSecureMcp::CommandLineParser.new }

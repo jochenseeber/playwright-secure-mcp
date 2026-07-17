@@ -1,4 +1,6 @@
 require "./spec_helper"
+require "../src/playwright_secure_mcp/configuration"
+require "../src/playwright_secure_mcp/package_manager"
 
 Spectator.describe PlaywrightSecureMcp::Configuration do
   it "exposes injected values" do

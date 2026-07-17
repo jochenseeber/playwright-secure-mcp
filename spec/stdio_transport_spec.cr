@@ -1,4 +1,5 @@
 require "./spec_helper"
+require "../src/playwright_secure_mcp/stdio_transport"
 
 Spectator.describe PlaywrightSecureMcp::StdioTransport do
   it "reads newline-delimited JSON objects and skips blanks" do

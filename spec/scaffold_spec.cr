@@ -1,4 +1,5 @@
 require "./spec_helper"
+require "../src/playwright_secure_mcp/version"
 require "yaml"
 
 Spectator.describe PlaywrightSecureMcp do

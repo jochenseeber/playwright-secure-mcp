@@ -1,4 +1,6 @@
 require "./spec_helper"
+require "../src/playwright_secure_mcp/item"
+require "../src/playwright_secure_mcp/website_matcher"
 
 private def item(id : String, *urls : String) : PlaywrightSecureMcp::Item
   PlaywrightSecureMcp::Item.new(

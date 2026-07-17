@@ -1,4 +1,5 @@
 require "./spec_helper"
+require "../src/playwright_secure_mcp/keyring_cipher"
 
 {% if flag?(:linux) %}
   Spectator.describe PlaywrightSecureMcp::KeyringCipher do

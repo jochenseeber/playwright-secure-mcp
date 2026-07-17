@@ -1,4 +1,6 @@
 require "./spec_helper"
+require "../src/playwright_secure_mcp/item"
+require "../src/playwright_secure_mcp/item_cache"
 
 private def field(cache, label, value)
   PlaywrightSecureMcp::Field.new(

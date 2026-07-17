@@ -1,4 +1,16 @@
 require "./spec_helper"
+require "../src/playwright_secure_mcp/field_selector"
+require "../src/playwright_secure_mcp/item_cache"
+require "../src/playwright_secure_mcp/item_finders"
+require "../src/playwright_secure_mcp/item_locator"
+require "../src/playwright_secure_mcp/item_result"
+require "../src/playwright_secure_mcp/page_url"
+require "../src/playwright_secure_mcp/proxy"
+require "../src/playwright_secure_mcp/redactor"
+require "../src/playwright_secure_mcp/secret_guard"
+require "../src/playwright_secure_mcp/secret_type_tool"
+require "../src/playwright_secure_mcp/stdio_transport"
+require "../src/playwright_secure_mcp/website_matcher"
 
 private class FakeUpstream
   getter received_browser_type_text : String?

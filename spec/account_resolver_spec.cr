@@ -1,5 +1,6 @@
 require "file_utils"
 require "./spec_helper"
+require "../src/playwright_secure_mcp/account_resolver"
 
 Spectator.describe PlaywrightSecureMcp::AccountResolver do
   let(resolver) { PlaywrightSecureMcp::AccountResolver.new }

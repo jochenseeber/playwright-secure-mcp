@@ -1,4 +1,5 @@
 require "./spec_helper"
+require "../src/playwright_secure_mcp/page_url"
 
 Spectator.describe PlaywrightSecureMcp::PageUrl do
   let(reader) { PlaywrightSecureMcp::PageUrl.new }

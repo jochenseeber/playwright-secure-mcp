@@ -1,4 +1,6 @@
 require "./spec_helper"
+require "../src/playwright_secure_mcp/item_cache"
+require "../src/playwright_secure_mcp/secret_guard"
 
 Spectator.describe PlaywrightSecureMcp::SecretGuard do
   it "does not raise for clean arguments" do

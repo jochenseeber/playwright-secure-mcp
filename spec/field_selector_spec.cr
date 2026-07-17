@@ -1,4 +1,7 @@
 require "./spec_helper"
+require "../src/playwright_secure_mcp/encrypted_secret"
+require "../src/playwright_secure_mcp/field_selector"
+require "../src/playwright_secure_mcp/item"
 
 private def fld(id, purpose, label, has_value)
   PlaywrightSecureMcp::Field.new(

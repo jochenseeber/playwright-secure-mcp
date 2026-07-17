@@ -1,4 +1,7 @@
 require "./spec_helper"
+require "../src/playwright_secure_mcp/cipher_selector"
+require "../src/playwright_secure_mcp/in_memory_cipher"
+require "../src/playwright_secure_mcp/secret_cipher"
 
 private def mem : PlaywrightSecureMcp::SecretCipher
   PlaywrightSecureMcp::InMemoryCipher.new

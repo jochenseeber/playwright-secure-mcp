@@ -1,4 +1,5 @@
 require "./spec_helper"
+require "../src/playwright_secure_mcp/secret_type_tool"
 
 private def args(hash) : JSON::Any
   JSON.parse(hash.to_json)

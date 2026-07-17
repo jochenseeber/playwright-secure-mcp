@@ -1,4 +1,5 @@
 require "./configuration"
+require "./package_manager"
 
 module PlaywrightSecureMcp
   class UpstreamCommand
