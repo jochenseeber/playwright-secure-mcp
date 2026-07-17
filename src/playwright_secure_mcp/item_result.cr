@@ -1,43 +1,28 @@
 require "json"
 require "./item"
+require "./item_identity"
+require "./tool_result"
 
 module PlaywrightSecureMcp
   # Serializes discovery results into an MCP tool result: a JSON array of item
   # identities plus non-secret field metadata. Never includes a field value.
   class ItemResult
-    def build(items : Array(Item)) : JSON::Any
-      payload = JSON::Any.new(items.map { |item| candidate(item) }).to_json
-      content = [JSON::Any.new({"type" => JSON::Any.new("text"), "text" => JSON::Any.new(payload)})]
-      JSON::Any.new({"content" => JSON::Any.new(content), "isError" => JSON::Any.new(false)})
+    def build(items : Array(Item)) : ToolTextResult
+      identities = items.map { |item| identity(item) }
+      ToolTextResult.new(identities.to_json, is_error: false)
     end
 
-    private def candidate(item : Item) : JSON::Any
-      JSON::Any.new({
-        "vault"    => JSON::Any.new(item.vault_id),
-        "item"     => JSON::Any.new(item.item_id),
-        "title"    => JSON::Any.new(item.title),
-        "urls"     => JSON::Any.new(item.urls.map { |url| JSON::Any.new(url) }),
-        "tags"     => JSON::Any.new(item.tags.map { |tag| JSON::Any.new(tag) }),
-        "fields"   => JSON::Any.new(item.fields.values.map { |field| field(field) }),
-        "sections" => JSON::Any.new(item.sections.values.map { |section| section(section) }),
-      })
+    private def identity(item : Item) : ItemIdentity
+      ItemIdentity.new(
+        vault: item.vault_id, item: item.item_id, title: item.title,
+        urls: item.urls, tags: item.tags,
+        fields: item.fields.values.map { |field| field_meta(field) },
+        sections: item.sections.values.map { |section| SectionMeta.new(section.id, section.label) })
     end
 
-    private def field(field : Field) : JSON::Any
-      entry = {
-        "id"    => JSON::Any.new(field.id),
-        "label" => JSON::Any.new(field.label),
-        "type"  => JSON::Any.new(field.type),
-      } of String => JSON::Any
-      purpose = field.purpose
-      entry["purpose"] = JSON::Any.new(purpose) unless purpose.nil?
-      section_id = field.section_id
-      entry["section"] = JSON::Any.new(section_id) unless section_id.nil?
-      JSON::Any.new(entry)
-    end
-
-    private def section(section : Section) : JSON::Any
-      JSON::Any.new({"id" => JSON::Any.new(section.id), "label" => JSON::Any.new(section.label)})
+    private def field_meta(field : Field) : FieldMeta
+      FieldMeta.new(id: field.id, label: field.label, type: field.type,
+        purpose: field.purpose, section: field.section_id)
     end
   end
 end

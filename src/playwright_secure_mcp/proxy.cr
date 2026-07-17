@@ -14,6 +14,7 @@ require "./secret_type_tool"
 require "./secret_guard"
 require "./item_finders"
 require "./item_result"
+require "./tool_result"
 
 module PlaywrightSecureMcp
   class Proxy
@@ -180,8 +181,8 @@ module PlaywrightSecureMcp
       arguments = message.dig?("params", "arguments") || JSON::Any.new({} of String => JSON::Any)
       url = current_page_url
       items = finder.find(url, arguments)
-      body = {"jsonrpc" => JSON::Any.new("2.0"), "id" => original_id, "result" => @item_result.build(items)}
-      send_to_client(JSON::Any.new(body))
+      result = @item_result.build(items)
+      send_to_client(to_any(JsonRpcToolResult.new(original_id, result)))
     rescue error : ItemLocator::Error | ItemFinder::MissingArgumentError | PageUrl::UnavailableError | UpstreamTimeoutError | KeyError | Channel::ClosedError
       send_to_client(error_result(message["id"], error.message || "item lookup failed"))
     rescue error : Exception
@@ -330,10 +331,13 @@ module PlaywrightSecureMcp
     end
 
     private def error_result(id : JSON::Any, text : String) : JSON::Any
-      content = [JSON::Any.new({"type" => JSON::Any.new("text"), "text" => JSON::Any.new(text)})]
-      result = {"content" => JSON::Any.new(content), "isError" => JSON::Any.new(true)}
-      body = {"jsonrpc" => JSON::Any.new("2.0"), "id" => id, "result" => JSON::Any.new(result)}
-      JSON::Any.new(body)
+      to_any(JsonRpcToolResult.new(id, ToolTextResult.new(text, is_error: true)))
+    end
+
+    # Bridge an outbound DTO into JSON::Any so the redaction gate in
+    # send_to_client still walks every string leaf before the client sees it.
+    private def to_any(value) : JSON::Any
+      JSON.parse(value.to_json)
     end
 
     private def send_to_client(message : JSON::Any) : Nil
