@@ -1,6 +1,7 @@
 require "option_parser"
 require "./configuration"
 require "./package_manager"
+require "./version"
 
 module PlaywrightSecureMcp
   class CommandLineParser
@@ -32,6 +33,7 @@ module PlaywrightSecureMcp
       option_parser.on("--account-from-git DIR", "read account email from DIR/.git/config") { |value| account_from_git = value }
       option_parser.on("--token-tag TAG", "1Password item tag holding a service-account token") { |value| token_tag = value }
       option_parser.on("--require-hardware-key", "refuse to start without Secure Enclave/TPM key protection") { require_hardware_key = true }
+      option_parser.on("--version", "show version and exit") { puts "playwright-secure-mcp #{VERSION}"; exit(0) }
       option_parser.on("-h", "--help", "show help") { puts option_parser; exit(0) }
       option_parser.invalid_option { |flag| raise Error.new("unknown option: #{flag}") }
       option_parser.unknown_args { |_, after_double_dash| upstream_arguments = after_double_dash }

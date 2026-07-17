@@ -10,11 +10,11 @@ secret value never reaches the LLM.**
 - The binary speaks MCP JSON-RPC 2.0 over stdio to the client (the LLM host)
   and spawns `@playwright/mcp` as a stdio child process, forwarding nearly all
   messages untouched.
-- It adds four secret tools to the upstream `tools/list`: three discovery
-  tools that list or find 1Password LOGIN items usable on the current browser
-  page, and `browser_type_secret`, which types a field of a chosen item into
-  the page. Closing the browser (`browser_close`) empties the local item
-  cache. See [Secret tools](#secret-tools).
+- It adds four secret tools to the upstream `tools/list`: three discovery tools
+  that list or find 1Password LOGIN items usable on the current browser page,
+  and `browser_type_secret`, which types a field of a chosen item into the
+  page. Closing the browser (`browser_close`) empties the local item cache. See
+  [Secret tools](#secret-tools).
 - Every message flowing back to the client is passed through a redactor that
   replaces each resolved secret — including its URL-encoded, Base64,
   HTML-escaped, and JSON-escaped variants — with the literal token
@@ -52,10 +52,10 @@ it takes the 1Password coordinates of the secret:
 
 The proxy resolves the field from the cached item (fetching the item from
 1Password on demand when it is not cached), decrypts the value locally, and
-issues an internal `browser_type` call to the upstream server with the
-resolved value. Typing is refused unless the current page is in the item's URL
-set (the same host + path-prefix match as discovery), and refused when the
-current page URL cannot be determined.
+issues an internal `browser_type` call to the upstream server with the resolved
+value. Typing is refused unless the current page is in the item's URL set (the
+same host + path-prefix match as discovery), and refused when the current page
+URL cannot be determined.
 
 ### Cache lifetime
 
@@ -75,8 +75,8 @@ process lifetime.
 
 ### Homebrew (macOS and Linux)
 
-Install from the Homebrew tap. The formula installs the prebuilt binary from the
-latest GitHub release (the macOS builds are signed and notarized):
+Install from the Homebrew tap. The formula installs the prebuilt binary from
+the latest GitHub release (the macOS builds are signed and notarized):
 
 ```bash
 brew install jochenseeber/tap/playwright-secure-mcp
@@ -101,8 +101,9 @@ rake setup
 rake build
 ```
 
-`rake build` writes a debug binary to `bin/<profile>-<mode>/playwright-secure-mcp`
-(e.g. `bin/darwin-arm64-system-dynamic-debug/…`) and a `bin/playwright-secure-mcp`
+`rake build` writes a debug binary to
+`bin/<profile>-<mode>/playwright-secure-mcp` (e.g.
+`bin/darwin-arm64-system-dynamic-debug/…`) and a `bin/playwright-secure-mcp`
 symlink to the latest build. Use `rake "build[release]"` for a release binary.
 Run `rake -T` to list all available tasks.
 
@@ -120,6 +121,7 @@ Run `rake -T` to list all available tasks.
 | `--account-email`        | _(none)_                | 1Password account email                                                   |
 | `--token-tag`            | _(none)_                | 1Password item tag whose `credential` field holds a service-account token |
 | `--require-hardware-key` | _(off)_                 | Refuse to start without Secure Enclave/TPM key protection                 |
+| `--version`              | _(none)_                | Print the version and exit                                                |
 | `-- <args...>`           | _(none)_                | Extra args forwarded to the upstream server                               |
 
 The three account options resolve to a single account passed to `op` via
@@ -151,10 +153,9 @@ directly.
   in anything the LLM receives.
 - Revealed items are cached in-memory for the process lifetime (or until the
   browser is closed via `browser_close`) in an obfuscated vault: each field
-  value is
-  AES-256-CBC encrypted under a random per-process data key with a fresh
-  random IV per entry. The data key itself is hardware-protected when possible
-  — see [Cache key protection](#cache-key-protection).
+  value is AES-256-CBC encrypted under a random per-process data key with a
+  fresh random IV per entry. The data key itself is hardware-protected when
+  possible — see [Cache key protection](#cache-key-protection).
 - **Caveat:** the vault is obfuscation / defense-in-depth, not a security
   boundary. With the in-memory fallback tier the encryption key lives in the
   same process memory as the ciphertext, so it defeats casual heap inspection,
