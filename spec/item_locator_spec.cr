@@ -34,6 +34,15 @@ Spectator.describe PlaywrightSecureMcp::ItemLocator do
     expect(String.new(value.not_nil!.ciphertext)).not_to eq("pw")
   end
 
+  it "reveals multiple login items from a concatenated op stream" do
+    keys = [
+      PlaywrightSecureMcp::ItemKey.new(vault_id: "v1", item_id: "login1"),
+      PlaywrightSecureMcp::ItemKey.new(vault_id: "v1", item_id: "login2"),
+    ]
+    items = locator.reveal(keys)
+    expect(items.map(&.item_id)).to eq(["login1", "login2"])
+  end
+
   it "maps sections onto the item" do
     items = locator.reveal([PlaywrightSecureMcp::ItemKey.new(vault_id: "v1", item_id: "login1")])
     expect(items.first.sections["sec1"].label).to eq("More")

@@ -25,10 +25,17 @@ fi
 
 if [ "$1" = "item" ] && [ "$2" = "get" ] && [ "$3" = "-" ]; then
   input="$(cat)"
+  # Real `op item get -` prints a STREAM of concatenated top-level JSON objects
+  # (one per requested item), NOT a JSON array. Mirror that exactly.
   case "$input" in
+    *login2*)
+      # Several LOGIN items requested -> two concatenated login objects.
+      printf '{"id":"login1","title":"Example","category":"LOGIN","vault":{"id":"v1"},"urls":[{"href":"https://example.com/login"}],"tags":["work"],"fields":[{"id":"password","type":"CONCEALED","purpose":"PASSWORD","label":"password","value":"pw"}]}\n{"id":"login2","title":"Second","category":"LOGIN","vault":{"id":"v1"},"urls":[{"href":"https://example.com/login"}],"tags":[],"fields":[{"id":"password","type":"CONCEALED","purpose":"PASSWORD","label":"password","value":"pw2"}]}\n'
+      exit 0
+      ;;
     *login1*)
-      # Return one login item (full, revealed) plus one non-login that must be dropped.
-      printf '[{"id":"login1","title":"Example","category":"LOGIN","vault":{"id":"v1"},"urls":[{"href":"https://example.com/login"}],"tags":["work"],"sections":[{"id":"sec1","label":"More"}],"fields":[{"id":"username","type":"STRING","purpose":"USERNAME","label":"username","value":"alice"},{"id":"password","type":"CONCEALED","purpose":"PASSWORD","label":"password","value":"pw"},{"id":"custom","type":"STRING","label":"Token","section":{"id":"sec1"},"value":"k"}]},{"id":"note1","title":"Note","category":"SECURE_NOTE","vault":{"id":"v1"},"fields":[]}]\n'
+      # One login plus one non-login (must be dropped) -- concatenated objects.
+      printf '{"id":"login1","title":"Example","category":"LOGIN","vault":{"id":"v1"},"urls":[{"href":"https://example.com/login"}],"tags":["work"],"sections":[{"id":"sec1","label":"More"}],"fields":[{"id":"username","type":"STRING","purpose":"USERNAME","label":"username","value":"alice"},{"id":"password","type":"CONCEALED","purpose":"PASSWORD","label":"password","value":"pw"},{"id":"custom","type":"STRING","label":"Token","section":{"id":"sec1"},"value":"k"}]}\n{"id":"note1","title":"Note","category":"SECURE_NOTE","vault":{"id":"v1"},"fields":[]}\n'
       exit 0
       ;;
   esac

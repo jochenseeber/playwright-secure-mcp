@@ -51,11 +51,56 @@ module PlaywrightSecureMcp
       raise Error.new("op returned a malformed item: #{error.message}")
     end
 
-    # `op item get -` returns a single object for one specifier, an array for
-    # several; normalize to an array.
+    # Normalize op's `--format=json` output to an array of item objects.
+    # `op item list` prints one JSON array; `op item get -` prints a single
+    # object for one specifier but a STREAM of concatenated top-level objects
+    # for several (not an array). Split the output into top-level JSON values
+    # (string/escape aware) and, when the whole output is a single array,
+    # return its elements.
     private def parse(output : String) : Array(JSON::Any)
-      parsed = JSON.parse(output)
-      parsed.as_a? || [parsed]
+      values = split_json_values(output)
+      if values.size == 1 && (array = values[0].as_a?)
+        array
+      else
+        values
+      end
+    end
+
+    private def split_json_values(output : String) : Array(JSON::Any)
+      values = [] of JSON::Any
+      depth = 0
+      in_string = false
+      escape = false
+      start = -1
+      output.each_char_with_index do |char, index|
+        if start < 0
+          next if char.whitespace?
+          start = index
+        end
+        if in_string
+          in_string, escape = scan_string_char(char, escape)
+        else
+          case char
+          when '"'      then in_string = true
+          when '{', '[' then depth += 1
+          when '}', ']'
+            depth -= 1
+            if depth == 0
+              values << JSON.parse(output[start..index])
+              start = -1
+            end
+          end
+        end
+      end
+      values
+    end
+
+    # Advances the string-literal scan by one character, returning the next
+    # {in_string, escape} state.
+    private def scan_string_char(char : Char, escape : Bool) : Tuple(Bool, Bool)
+      return {true, false} if escape
+      return {true, true} if char == '\\'
+      {char != '"', false}
     end
 
     private def summary_from(entry : JSON::Any) : Item
