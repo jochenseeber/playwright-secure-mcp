@@ -30,11 +30,16 @@ Treat yourself as the senior engineer responsible for the final result.
 ## Secret workflow
 
 - To type a secret, first call one of the discovery tools
-  (`browser_find_secret_by_name`, `browser_find_secret_by_tag`,
-  `browser_find_secret_by_url`) to obtain the 1Password `vault` and `item` IDs,
+  (`browser_list_items`, `browser_find_items_by_name`,
+  `browser_find_items_by_tag`) to obtain the 1Password `vault` and `item` IDs,
   then pass those IDs plus the `field` to `browser_type_secret`.
-- Discovery tools return item identities only; MUST NOT expect or request
-  secret values from them.
+- Discovery tools return only the LOGIN items usable on the current browser
+  page (host + path-prefix match on the item's URL set), as item identities
+  plus field metadata; MUST NOT expect or request secret values from them.
+- `browser_type_secret` is refused unless the current page is in the item's
+  URL set, and fails closed when the page URL cannot be determined.
+- Closing the browser (`browser_close`) empties the in-memory item cache; the
+  close call is still forwarded to the upstream server.
 
 ## Invariants
 
@@ -49,10 +54,10 @@ Treat yourself as the senior engineer responsible for the final result.
 
 - One class per file under `src/playwright_secure_mcp/`, instance methods only,
   collaborators injected via the constructor.
-- `Proxy` is the routing/interception core; `Upstream`, `SecretResolver`,
-  `SecretVault`, `Redactor`, `SecretTypeTool`, and the `SecretFinder`
-  subclasses are injected collaborators.
-- `SecretVault` delegates crypto to a `SecretCipher` selected by
+- `Proxy` is the routing/interception core; `Upstream`, `ItemCache`,
+  `ItemLocator`, `PageUrl`, `WebsiteMatcher`, `Redactor`, `SecretTypeTool`,
+  and the `ItemFinder` subclasses are injected collaborators.
+- `ItemCache` delegates crypto to a `SecretCipher` selected by
   `CipherSelector` (macOS: Secure Enclave → in-memory; Linux: TPM 2.0 → kernel
   keyring → in-memory; `--require-hardware-key` fails closed unless a hardware
   tier — Secure Enclave or TPM — initializes).

@@ -11,6 +11,8 @@ crystallang
 dpreview
 ecies
 elif
+encryptor
+esac
 esys
 gcompat
 gsub
@@ -26,6 +28,7 @@ libcs
 libtss
 livecheck
 ltss
+mlock
 musl
 nomemory
 notarization
@@ -45,6 +48,7 @@ softprops
 stdlib
 tcti
 teamid
+tempname
 tpmrm
 ulimits
 urlsafe

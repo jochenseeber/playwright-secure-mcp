@@ -23,6 +23,21 @@ module PlaywrightSecureMcp
       scored.map(&.item)
     end
 
+    # True iff some item URL host-matches the page and its path is root, equal,
+    # or a segment-boundary prefix of the page path.
+    def matches?(page_url : String, item : Item) : Bool
+      page = parse_url(page_url)
+      return false if page.nil?
+      page_host = normalize_host(page.host)
+      page_path = page.path
+      item.urls.any? do |raw|
+        candidate = parse_url(raw)
+        next false if candidate.nil?
+        next false unless same_site?(normalize_host(candidate.host), page_host)
+        path_matches?(candidate.path, page_path)
+      end
+    end
+
     private def best_match(item : Item, page_host : String, page_path : String) : UrlMatch?
       best = nil
       item.urls.each do |raw|
@@ -70,14 +85,18 @@ module PlaywrightSecureMcp
       equal || page_is_subdomain || item_is_subdomain
     end
 
-    # Scores a match only on a path-segment boundary, so "/admin" matches
+    # Matches only on a path-segment boundary, so "/admin" matches
     # "/admin/login" but not "/administrator". Root and empty item paths match
-    # every page path at their natural low score.
+    # every page path.
+    private def path_matches?(item_path : String, page_path : String) : Bool
+      return true if item_path.empty? || item_path == "/"
+      page_path == item_path || page_path.starts_with?("#{item_path}/")
+    end
+
+    # Scores a matching path by its length; root and non-prefix paths both score
+    # zero, so the boolean question is answered by `path_matches?`, never here.
     private def path_score(item_path : String, page_path : String) : Int32
-      root = item_path.empty? || item_path == "/"
-      matched = root || page_path == item_path || page_path.starts_with?("#{item_path}/")
-      score = matched ? item_path.size : 0
-      score
+      path_matches?(item_path, page_path) ? item_path.size : 0
     end
   end
 end

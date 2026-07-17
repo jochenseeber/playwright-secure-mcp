@@ -1,5 +1,9 @@
 require "./spec_helper"
 
+private def args(hash) : JSON::Any
+  JSON.parse(hash.to_json)
+end
+
 Spectator.describe PlaywrightSecureMcp::SecretTypeTool do
   let(tool) { PlaywrightSecureMcp::SecretTypeTool.new }
 
@@ -16,23 +20,29 @@ Spectator.describe PlaywrightSecureMcp::SecretTypeTool do
     expect(annotations["destructiveHint"].as_bool).to eq(true)
   end
 
-  it "assembles the op reference from vault, item, and field ids" do
-    arguments = JSON.parse(%({"element":"Password","ref":"e5","vault":"v1","item":"i1","field":"password"}))
-    expect(tool.reference(arguments)).to eq("op://v1/i1/password")
+  it "builds an ItemKey from vault and item" do
+    key = tool.key(args({"vault" => "v1", "item" => "i1", "field" => "password"}))
+    expect(key.vault_id).to eq("v1")
+    expect(key.item_id).to eq("i1")
   end
 
-  it "raises when a required id is missing" do
-    arguments = JSON.parse(%({"element":"Password","ref":"e5","vault":"v1","item":"i1"}))
-    expect { tool.reference(arguments) }.to raise_error(PlaywrightSecureMcp::SecretTypeTool::MissingArgumentError)
+  it "extracts the field name" do
+    expect(tool.field_name(args({"vault" => "v", "item" => "i", "field" => "password"}))).to eq("password")
   end
 
-  it "builds browser_type arguments with the secret as text" do
-    arguments = JSON.parse(%({"element":"Password","ref":"e5","vault":"v1","item":"i1","field":"password","submit":true}))
-    built = tool.build_browser_type_arguments(arguments: arguments, secret: "sekret")
+  it "builds browser_type arguments with the secret and passes options through" do
+    built = tool.build_browser_type_arguments(
+      arguments: args({"element" => "Password", "ref" => "e1", "submit" => true}),
+      secret: "s3cr3t")
     expect(built["element"].as_s).to eq("Password")
-    expect(built["target"].as_s).to eq("e5")
-    expect(built["text"].as_s).to eq("sekret")
-    expect(built["submit"].as_bool).to eq(true)
+    expect(built["target"].as_s).to eq("e1")
+    expect(built["text"].as_s).to eq("s3cr3t")
+    expect(built["submit"].as_bool).to be_true
     expect(built.as_h.has_key?("slowly")).to be_false
+  end
+
+  it "raises when a required argument is missing" do
+    expect { tool.key(args({"item" => "i", "field" => "password"})) }
+      .to raise_error(PlaywrightSecureMcp::SecretTypeTool::MissingArgumentError)
   end
 end

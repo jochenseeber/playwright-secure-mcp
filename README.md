@@ -10,10 +10,11 @@ secret value never reaches the LLM.**
 - The binary speaks MCP JSON-RPC 2.0 over stdio to the client (the LLM host)
   and spawns `@playwright/mcp` as a stdio child process, forwarding nearly all
   messages untouched.
-- It adds four secret tools to the upstream `tools/list`: three discovery tools
-  that resolve 1Password items into identities (IDs), and
-  `browser_type_secret`, which types a field of such an item into the page. See
-  [Secret tools](#secret-tools).
+- It adds four secret tools to the upstream `tools/list`: three discovery
+  tools that list or find 1Password LOGIN items usable on the current browser
+  page, and `browser_type_secret`, which types a field of a chosen item into
+  the page. Closing the browser (`browser_close`) empties the local item
+  cache. See [Secret tools](#secret-tools).
 - Every message flowing back to the client is passed through a redactor that
   replaces each resolved secret — including its URL-encoded, Base64,
   HTML-escaped, and JSON-escaped variants — with the literal token
@@ -22,22 +23,23 @@ secret value never reaches the LLM.**
 
 ## Secret tools
 
-### Discovery: find an item's IDs
+### Discovery: list or find items for the current page
 
-Three tools look up 1Password items and return only their identities as a JSON
-array of `{"vault": ..., "item": ..., "title": ...}` objects (plus `"url"` for
-items that have one) — never a secret value. All three accept an optional
-`vault` (ID or name) to scope the search.
+Three tools look up 1Password LOGIN items and return only those usable on the
+current browser page: the proxy reads the page's `location.href` itself (the
+caller never supplies a URL) and keeps an item only when one of its URLs
+matches the page by host and path prefix. If the current URL cannot be
+determined, discovery fails with an error. Results are a JSON array of item
+identities plus non-secret field metadata — `vault`, `item`, `title`, `urls`,
+`tags`, `fields` (id, label, type, purpose, section), and `sections` — never a
+field value. All three accept an optional `vault` (ID or name) to scope the
+search.
 
-| Tool                          | Required arguments  | Result                                    |
-| ----------------------------- | ------------------- | ----------------------------------------- |
-| `browser_find_secret_by_name` | `item` (ID or name) | The matching item                         |
-| `browser_find_secret_by_tag`  | `tag`               | All items carrying the tag                |
-| `browser_find_secret_by_url`  | `url`               | Login items matching the given page URL   |
-
-`browser_find_secret_by_url` takes the page `url` as an argument and ranks login
-items by domain and longest matching path. It queries 1Password only — it never
-takes a page snapshot or calls the upstream server.
+| Tool                         | Required arguments   | Result                                               |
+| ---------------------------- | -------------------- | ---------------------------------------------------- |
+| `browser_list_items`         | _(none)_             | All LOGIN items usable on the current page           |
+| `browser_find_items_by_name` | `item` (title or ID) | Matching items, filtered to the current page         |
+| `browser_find_items_by_tag`  | `tag`                | Items carrying the tag, filtered to the current page |
 
 ### Typing: `browser_type_secret`
 
@@ -48,14 +50,25 @@ it takes the 1Password coordinates of the secret:
   ID), `item` (1Password item ID), `field` (e.g. `username` or `password`)
 - Optional: `submit`, `slowly` (as in `browser_type`)
 
-The proxy assembles `op://vault/item/field`, resolves it locally via `op read`,
-and issues an internal `browser_type` call to the upstream server with the
-resolved value.
+The proxy resolves the field from the cached item (fetching the item from
+1Password on demand when it is not cached), decrypts the value locally, and
+issues an internal `browser_type` call to the upstream server with the
+resolved value. Typing is refused unless the current page is in the item's URL
+set (the same host + path-prefix match as discovery), and refused when the
+current page URL cannot be determined.
+
+### Cache lifetime
+
+Discovered items — with their field values encrypted — are cached in memory,
+write-once. Calling the upstream `browser_close` tool empties this cache (the
+close is still forwarded to the browser as usual); otherwise it lives for the
+process lifetime.
 
 ### Workflow: find, then type
 
-1. Call a discovery tool to obtain the `vault` and `item` IDs — e.g. pass the
-   login page URL to `browser_find_secret_by_url`.
+1. Navigate to the login page, then call a discovery tool — e.g.
+   `browser_list_items` — to obtain the `vault` and `item` IDs of an item
+   usable on that page.
 2. Call `browser_type_secret` with those IDs and the `field` to type.
 
 ## Install
@@ -136,9 +149,10 @@ directly.
 - The resolved secret travels `op` → this process → upstream child → browser.
   It is never present in anything the LLM sent, and never present un-redacted
   in anything the LLM receives.
-- Resolved secrets are cached in-memory for the process lifetime in an
-  obfuscated vault: keys are SHA-256 hashes of the `op://` reference, values
-  are AES-256-CBC encrypted under a random per-process data key with a fresh
+- Revealed items are cached in-memory for the process lifetime (or until the
+  browser is closed via `browser_close`) in an obfuscated vault: each field
+  value is
+  AES-256-CBC encrypted under a random per-process data key with a fresh
   random IV per entry. The data key itself is hardware-protected when possible
   — see [Cache key protection](#cache-key-protection).
 - **Caveat:** the vault is obfuscation / defense-in-depth, not a security

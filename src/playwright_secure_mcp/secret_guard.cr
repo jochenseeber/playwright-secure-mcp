@@ -1,6 +1,5 @@
 require "json"
-require "./secret_vault"
-require "./secret_resolver"
+require "./item_cache"
 require "./secret_type_tool"
 
 module PlaywrightSecureMcp
@@ -10,7 +9,9 @@ module PlaywrightSecureMcp
     class ViolationError < Exception
     end
 
-    def initialize(@vault : SecretVault)
+    REFERENCE_PREFIX = "op://"
+
+    def initialize(@cache : ItemCache)
     end
 
     def check(arguments : JSON::Any) : Nil
@@ -32,12 +33,12 @@ module PlaywrightSecureMcp
     end
 
     private def check_references(strings : Array(String)) : Nil
-      return unless strings.any?(&.includes?(SecretResolver::REFERENCE_PREFIX))
+      return unless strings.any?(&.includes?(REFERENCE_PREFIX))
       raise ViolationError.new("op:// secret references may only be passed to #{SecretTypeTool::NAME}")
     end
 
     private def check_plaintexts(strings : Array(String)) : Nil
-      @vault.each_plaintext do |secret|
+      @cache.each_plaintext do |secret|
         next if secret.empty?
         if strings.any?(&.includes?(secret))
           raise ViolationError.new("resolved secret values must not be sent to upstream tools; use #{SecretTypeTool::NAME}")

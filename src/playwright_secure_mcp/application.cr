@@ -6,14 +6,15 @@ require "./command_line_parser"
 require "./upstream_command"
 require "./upstream"
 require "./stdio_transport"
-require "./secret_resolver"
-require "./secret_vault"
+require "./item_cache"
 require "./cipher_selector"
 require "./redactor"
 require "./secret_type_tool"
 require "./item_locator"
 require "./website_matcher"
-require "./secret_finders"
+require "./field_selector"
+require "./page_url"
+require "./item_finders"
 require "./item_result"
 require "./secret_guard"
 require "./proxy"
@@ -37,57 +38,53 @@ module PlaywrightSecureMcp
       account = AccountLocator.new(op_command: configuration.op_command).locate(account)
       cipher = CipherSelector.for_host.select(require_hardware: configuration.require_hardware_key)
       Log.info { "cache key protection: #{cipher.description}" }
-      vault = SecretVault.new(cipher: cipher)
-      token = fetch_token(configuration, account, vault)
-      secret_resolver = SecretResolver.new(
-        op_command: configuration.op_command,
-        account: token ? nil : account,
-        service_account_token: token,
-      )
+      cache = ItemCache.new(cipher)
+      token = fetch_token(configuration, account)
       item_locator = ItemLocator.new(
         op_command: configuration.op_command,
         account: token ? nil : account,
         service_account_token: token,
+        encryptor: cache,
       )
+      # Store the token as a loose secret so the redactor and guard cover it.
+      cache.add_loose_secret(token) if token && !token.empty?
       tokens = UpstreamCommand.new(configuration).tokens
       upstream_process = Upstream.new(tokens)
       upstream_transport = upstream_process.start
       begin
-        build_proxy(upstream_transport, vault: vault, secret_resolver: secret_resolver, item_locator: item_locator).run
+        build_proxy(upstream_transport, cache: cache, item_locator: item_locator).run
       ensure
         upstream_process.stop
       end
     end
 
-    private def fetch_token(configuration : Configuration, account : String?, vault : SecretVault) : String?
+    private def fetch_token(configuration : Configuration, account : String?) : String?
       tag = configuration.token_tag
       return nil unless tag
 
       token = TokenFetcher.new(op_command: configuration.op_command, account: account).fetch(tag)
       return nil if token.empty?
 
-      # Store the token in the vault so the redactor and guard cover it.
-      vault.store("service-account-token", token)
       token
     end
 
-    private def build_proxy(upstream_transport : StdioTransport, *, vault : SecretVault, secret_resolver : SecretResolver, item_locator : ItemLocator) : Proxy
+    private def build_proxy(upstream_transport : StdioTransport, *, cache : ItemCache, item_locator : ItemLocator) : Proxy
       finders = [
-        UrlSecretFinder.new(
-          item_locator: item_locator,
-          website_matcher: WebsiteMatcher.new,
-        ),
-        NameSecretFinder.new(item_locator),
-        TagSecretFinder.new(item_locator),
-      ] of SecretFinder
+        ListItemsFinder.new(cache: cache, item_locator: item_locator, website_matcher: WebsiteMatcher.new),
+        NameItemsFinder.new(cache: cache, item_locator: item_locator, website_matcher: WebsiteMatcher.new),
+        TagItemsFinder.new(cache: cache, item_locator: item_locator, website_matcher: WebsiteMatcher.new),
+      ] of ItemFinder
       proxy = Proxy.new(
         client: StdioTransport.new(input: STDIN, output: STDOUT),
         upstream: upstream_transport,
-        secret_resolver: secret_resolver,
-        secret_vault: vault,
-        redactor: Redactor.new(vault),
+        item_cache: cache,
+        item_locator: item_locator,
+        field_selector: FieldSelector.new,
+        page_url: PageUrl.new,
+        website_matcher: WebsiteMatcher.new,
+        redactor: Redactor.new(cache),
+        secret_guard: SecretGuard.new(cache),
         secret_type_tool: SecretTypeTool.new,
-        secret_guard: SecretGuard.new(vault),
         finders: finders,
         item_result: ItemResult.new,
       )

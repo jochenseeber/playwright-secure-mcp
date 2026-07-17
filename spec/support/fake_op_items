@@ -1,7 +1,40 @@
 #!/usr/bin/env bash
-# Fake `op` CLI for TokenFetcher specs. Supports:
+# Fake `op` CLI shared by the ItemLocator/finder and TokenFetcher specs.
+# ItemLocator:
+#   op item list --categories Login [--tags T] [--vault V] --format=json
+#   op item get - --reveal --format=json   (specifiers as JSON array on stdin)
+# TokenFetcher:
 #   op item list --tags <TAG> --format=json [--account X]
-#   op item get <ID> --fields label=credential --reveal --format=json [--account X]
+#   op item get item123 --fields label=credential --reveal --format=json
+category=""
+login_tag=""
+for ((i=1;i<=$#;i++)); do
+  [ "${!i}" = "--categories" ] && { j=$((i+1)); category="${!j}"; }
+  [ "${!i}" = "--tags" ] && { j=$((i+1)); login_tag="${!j}"; }
+done
+
+if [ "$1" = "item" ] && [ "$2" = "list" ] && [ "$category" = "Login" ]; then
+  # The only login carries the tag "work"; honor --tags so tag narrowing is real.
+  if [ -z "$login_tag" ] || [ "$login_tag" = "work" ]; then
+    printf '[{"id":"login1","title":"Example","category":"LOGIN","vault":{"id":"v1"},"urls":[{"href":"https://example.com/login"}],"tags":["work"]}]\n'
+  else
+    printf '[]\n'
+  fi
+  exit 0
+fi
+
+if [ "$1" = "item" ] && [ "$2" = "get" ] && [ "$3" = "-" ]; then
+  input="$(cat)"
+  case "$input" in
+    *login1*)
+      # Return one login item (full, revealed) plus one non-login that must be dropped.
+      printf '[{"id":"login1","title":"Example","category":"LOGIN","vault":{"id":"v1"},"urls":[{"href":"https://example.com/login"}],"tags":["work"],"sections":[{"id":"sec1","label":"More"}],"fields":[{"id":"username","type":"STRING","purpose":"USERNAME","label":"username","value":"alice"},{"id":"password","type":"CONCEALED","purpose":"PASSWORD","label":"password","value":"pw"},{"id":"custom","type":"STRING","label":"Token","section":{"id":"sec1"},"value":"k"}]},{"id":"note1","title":"Note","category":"SECURE_NOTE","vault":{"id":"v1"},"fields":[]}]\n'
+      exit 0
+      ;;
+  esac
+  exit 1
+fi
+
 if [ "$1" = "item" ] && [ "$2" = "list" ]; then
   shift 2
   tag=""

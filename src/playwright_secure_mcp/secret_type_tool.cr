@@ -1,4 +1,5 @@
 require "json"
+require "./item"
 
 module PlaywrightSecureMcp
   class SecretTypeTool
@@ -11,7 +12,7 @@ module PlaywrightSecureMcp
     DEFINITION_JSON = <<-JSON
       {
         "name": "browser_type_secret",
-        "description": "Type a secret from 1Password into an element. Provide vault, item (both 1Password IDs, e.g. from browser_find_secret_by_name/_by_tag/_by_url) and field (e.g. \\"username\\" or \\"password\\"). The value is resolved locally and never exposed. Mirrors browser_type otherwise.",
+        "description": "Type a secret from 1Password into an element. Provide vault, item (both 1Password IDs, e.g. from browser_list_items or browser_find_items_by_name/_by_tag) and field (e.g. \\"username\\" or \\"password\\"). Only allowed while the current page is in the item's URL set. The value is resolved locally and never exposed. Mirrors browser_type otherwise.",
         "annotations": {
           "title": "Type secret into page",
           "readOnlyHint": false,
@@ -38,11 +39,12 @@ module PlaywrightSecureMcp
       JSON.parse(DEFINITION_JSON)
     end
 
-    def reference(arguments : JSON::Any) : String
-      vault = fetch_string(arguments, "vault")
-      item = fetch_string(arguments, "item")
-      field = fetch_string(arguments, "field")
-      "op://#{vault}/#{item}/#{field}"
+    def key(arguments : JSON::Any) : ItemKey
+      ItemKey.new(vault_id: fetch_string(arguments, "vault"), item_id: fetch_string(arguments, "item"))
+    end
+
+    def field_name(arguments : JSON::Any) : String
+      fetch_string(arguments, "field")
     end
 
     def build_browser_type_arguments(*, arguments : JSON::Any, secret : String) : JSON::Any

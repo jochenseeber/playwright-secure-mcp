@@ -1,53 +1,40 @@
 require "./spec_helper"
 
-private FAKE_OP_LOOKUP = File.expand_path("support/fake_op_lookup", __DIR__)
+private FAKE_OP_ITEMS = File.expand_path("support/fake_op_items", __DIR__)
 
 Spectator.describe PlaywrightSecureMcp::ItemLocator do
-  let(locator) { PlaywrightSecureMcp::ItemLocator.new(op_command: FAKE_OP_LOOKUP, account: nil) }
-
-  it "resolves an item by name to its ids" do
-    item = locator.by_name("Netflix", nil)
-    expect(item.vault_id).to eq("vault1")
-    expect(item.item_id).to eq("item1")
+  let(cache) { PlaywrightSecureMcp::ItemCache.new }
+  let(locator) do
+    PlaywrightSecureMcp::ItemLocator.new(
+      op_command: FAKE_OP_ITEMS, account: nil, encryptor: cache)
   end
 
-  it "passes the vault scope through to op" do
-    item = locator.by_name("Scoped", "privatevault")
-    expect(item.item_id).to eq("scoped1")
-  end
-
-  it "raises when op fails, naming the full op subcommand" do
-    expect { locator.by_name("Scoped", nil) }
-      .to raise_error(PlaywrightSecureMcp::ItemLocator::Error, /op item get Scoped --format=json failed/)
-  end
-
-  it "lists items by tag" do
-    items = locator.by_tag("apikey", nil)
-    expect(items.map(&.item_id)).to eq(["item1", "item2"])
-  end
-
-  it "raises when op returns a non-array item list" do
-    expect { locator.by_tag("badshape", nil) }.to raise_error(PlaywrightSecureMcp::ItemLocator::Error)
-  end
-
-  it "forwards the account to op" do
-    account_locator = PlaywrightSecureMcp::ItemLocator.new(op_command: FAKE_OP_LOOKUP, account: "acct1")
-    item = account_locator.by_name("AccountProbe", nil)
-    expect(item.item_id).to eq("acct-item")
-  end
-
-  it "passes the service account token via the environment and omits --account" do
-    token_locator = PlaywrightSecureMcp::ItemLocator.new(
-      op_command: FAKE_OP_LOOKUP,
-      account: "acct1",
-      service_account_token: "tok"
-    )
-    item = token_locator.by_name("TokenProbe", nil)
-    expect(item.item_id).to eq("tok-item")
-  end
-
-  it "fetches login items with their urls" do
-    items = locator.logins(nil)
+  it "lists login items as summaries with urls and tags" do
+    items = locator.list_logins(nil)
+    expect(items.map(&.item_id)).to eq(["login1"])
     expect(items.first.urls).to eq(["https://example.com/login"])
+    expect(items.first.tags).to eq(["work"])
+    expect(items.first.fields.empty?).to be_true
+  end
+
+  it "reveals items in one batched call and encrypts field values" do
+    keys = [PlaywrightSecureMcp::ItemKey.new(vault_id: "v1", item_id: "login1")]
+    items = locator.reveal(keys)
+    expect(items.map(&.item_id)).to eq(["login1"]) # non-login dropped
+    fields = items.first.fields
+    expect(fields.size).to eq(3)
+    pw = fields.values.find! { |field| field.purpose == "PASSWORD" }
+    value = pw.value
+    expect(value).not_to be_nil
+    # value is encrypted, not the plaintext
+    # ameba:disable Lint/NotNil
+    expect(String.new(value.not_nil!.ciphertext)).not_to eq("pw")
+  end
+
+  it "maps sections onto the item" do
+    items = locator.reveal([PlaywrightSecureMcp::ItemKey.new(vault_id: "v1", item_id: "login1")])
+    expect(items.first.sections["sec1"].label).to eq("More")
+    custom = items.first.fields["custom"]
+    expect(custom.section_id).to eq("sec1")
   end
 end

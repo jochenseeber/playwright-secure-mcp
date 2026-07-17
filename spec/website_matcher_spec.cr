@@ -1,7 +1,11 @@
 require "./spec_helper"
 
 private def item(id : String, *urls : String) : PlaywrightSecureMcp::Item
-  PlaywrightSecureMcp::Item.new(vault_id: "v", item_id: id, title: id, urls: urls.to_a)
+  PlaywrightSecureMcp::Item.new(
+    key: PlaywrightSecureMcp::ItemKey.new(vault_id: "v", item_id: id),
+    title: id, urls: urls.to_a, tags: [] of String,
+    fields: {} of String => PlaywrightSecureMcp::Field,
+    sections: {} of String => PlaywrightSecureMcp::Section)
 end
 
 Spectator.describe PlaywrightSecureMcp::WebsiteMatcher do
@@ -57,5 +61,12 @@ Spectator.describe PlaywrightSecureMcp::WebsiteMatcher do
   it "returns an empty list when the page url itself is unparseable" do
     items = [item("a", "https://example.com")]
     expect(matcher.rank("http://host:not-a-port/x", items)).to be_empty
+  end
+
+  it "matches? is true for same host and prefix path, false otherwise" do
+    candidate = item("i", "https://example.com/app")
+    expect(matcher.matches?("https://example.com/app/login", candidate)).to be_true
+    expect(matcher.matches?("https://example.com/other", candidate)).to be_false
+    expect(matcher.matches?("https://evil.com/app", candidate)).to be_false
   end
 end

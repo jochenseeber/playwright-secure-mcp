@@ -2,9 +2,14 @@ require "./spec_helper"
 
 private class FakeUpstream
   getter received_browser_type_text : String?
+  getter? received_close : Bool
 
-  def initialize(@transport : PlaywrightSecureMcp::StdioTransport, @fail : Bool = false, @type_hang : Bool = false)
+  def initialize(@transport : PlaywrightSecureMcp::StdioTransport, *,
+                 @page_url : String = "https://example.com/login",
+                 @fail : Bool = false, @type_hang : Bool = false,
+                 @evaluate_blank : Bool = false)
     @received_browser_type_text = nil
+    @received_close = false
   end
 
   def serve : Nil
@@ -22,17 +27,34 @@ private class FakeUpstream
       tools = [tool("browser_click"), tool("browser_type"), tool("browser_snapshot")]
       reply(id, {"tools" => JSON::Any.new(tools)})
     when "tools/call"
-      arguments = request["params"]["arguments"]
-      @received_browser_type_text = arguments["text"]?.try(&.as_s)
-      return if @type_hang # simulate an upstream that never answers the forwarded call
-      if @fail
-        message = "could not type #{arguments["text"].as_s} into target #{arguments["target"]?.try(&.as_s)}"
-        reply(id, {"content" => JSON::Any.new([text_content(message)]), "isError" => JSON::Any.new(true)})
-      else
-        reply(id, {"content" => JSON::Any.new([text_content("typed #{arguments["text"].as_s}")]), "isError" => JSON::Any.new(false)})
-      end
+      handle_tool_call(id, request)
     else
       reply(id, {} of String => JSON::Any)
+    end
+  end
+
+  private def handle_tool_call(id : JSON::Any, request : JSON::Any) : Nil
+    arguments = request["params"]["arguments"]
+    if request["params"]["name"].as_s == "browser_close"
+      @received_close = true
+      reply(id, {"content" => JSON::Any.new([text_content("closed")]), "isError" => JSON::Any.new(false)})
+      return
+    end
+    if request["params"]["name"].as_s == "browser_evaluate"
+      if @evaluate_blank
+        reply(id, {"content" => JSON::Any.new([text_content("")]), "isError" => JSON::Any.new(false)})
+      else
+        reply(id, {"content" => JSON::Any.new([text_content(@page_url)]), "isError" => JSON::Any.new(false)})
+      end
+      return
+    end
+    @received_browser_type_text = arguments["text"]?.try(&.as_s)
+    return if @type_hang # simulate an upstream that never answers the forwarded call
+    if @fail
+      message = "could not type #{arguments["text"].as_s} into target #{arguments["target"]?.try(&.as_s)}"
+      reply(id, {"content" => JSON::Any.new([text_content(message)]), "isError" => JSON::Any.new(true)})
+    else
+      reply(id, {"content" => JSON::Any.new([text_content("typed #{arguments["text"].as_s}")]), "isError" => JSON::Any.new(false)})
     end
   end
 
@@ -50,28 +72,30 @@ private class FakeUpstream
   end
 end
 
-private FAKE_OP        = File.expand_path("support/fake_op", __DIR__)
-private FAKE_OP_LOOKUP = File.expand_path("support/fake_op_lookup", __DIR__)
+private FAKE_OP_ITEMS = File.expand_path("support/fake_op_items", __DIR__)
 
 private def build_proxy(client, upstream, upstream_timeout : Time::Span = 60.seconds)
-  vault = PlaywrightSecureMcp::SecretVault.new
-  locator = PlaywrightSecureMcp::ItemLocator.new(op_command: FAKE_OP_LOOKUP, account: nil)
+  cache = PlaywrightSecureMcp::ItemCache.new
+  locator = PlaywrightSecureMcp::ItemLocator.new(op_command: FAKE_OP_ITEMS, account: nil, encryptor: cache)
   finders = [
-    PlaywrightSecureMcp::UrlSecretFinder.new(
-      item_locator: locator,
-      website_matcher: PlaywrightSecureMcp::WebsiteMatcher.new,
-    ),
-    PlaywrightSecureMcp::NameSecretFinder.new(locator),
-    PlaywrightSecureMcp::TagSecretFinder.new(locator),
-  ] of PlaywrightSecureMcp::SecretFinder
+    PlaywrightSecureMcp::ListItemsFinder.new(
+      cache: cache, item_locator: locator, website_matcher: PlaywrightSecureMcp::WebsiteMatcher.new),
+    PlaywrightSecureMcp::NameItemsFinder.new(
+      cache: cache, item_locator: locator, website_matcher: PlaywrightSecureMcp::WebsiteMatcher.new),
+    PlaywrightSecureMcp::TagItemsFinder.new(
+      cache: cache, item_locator: locator, website_matcher: PlaywrightSecureMcp::WebsiteMatcher.new),
+  ] of PlaywrightSecureMcp::ItemFinder
   PlaywrightSecureMcp::Proxy.new(
     client: client,
     upstream: upstream,
-    secret_resolver: PlaywrightSecureMcp::SecretResolver.new(op_command: FAKE_OP),
-    secret_vault: vault,
-    redactor: PlaywrightSecureMcp::Redactor.new(vault),
+    item_cache: cache,
+    item_locator: locator,
+    field_selector: PlaywrightSecureMcp::FieldSelector.new,
+    page_url: PlaywrightSecureMcp::PageUrl.new,
+    website_matcher: PlaywrightSecureMcp::WebsiteMatcher.new,
+    redactor: PlaywrightSecureMcp::Redactor.new(cache),
+    secret_guard: PlaywrightSecureMcp::SecretGuard.new(cache),
     secret_type_tool: PlaywrightSecureMcp::SecretTypeTool.new,
-    secret_guard: PlaywrightSecureMcp::SecretGuard.new(vault),
     finders: finders,
     item_result: PlaywrightSecureMcp::ItemResult.new,
     upstream_timeout: upstream_timeout,
@@ -102,47 +126,19 @@ Spectator.describe PlaywrightSecureMcp::Proxy do
     response = w[:driver].read || raise("no response")
     names = response["result"]["tools"].as_a.map(&.["name"].as_s)
     expect(names.includes?("browser_type_secret")).to be_true
-    expect(names.includes?("browser_find_secret_by_url")).to be_true
-    expect(names.includes?("browser_find_secret_by_name")).to be_true
-    expect(names.includes?("browser_find_secret_by_tag")).to be_true
+    expect(names.includes?("browser_list_items")).to be_true
+    expect(names.includes?("browser_find_items_by_name")).to be_true
+    expect(names.includes?("browser_find_items_by_tag")).to be_true
+    expect(names.size).to eq(7) # 3 upstream + browser_type_secret + 3 finders
     w[:client_in_w].close
   end
 
-  it "resolves vault/item/field, types it, and redacts the echoed value" do
-    w = wired
-    fake = FakeUpstream.new(w[:fake_transport])
-    fake.serve
-    spawn { build_proxy(w[:client_side], w[:upstream_side]).run }
-
-    call = %({"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"browser_type_secret","arguments":{"element":"Password","ref":"e1","vault":"ok","item":"item","field":"field"}}})
-    w[:driver].write(JSON.parse(call))
-    response = w[:driver].read || raise("no response")
-
-    expect(fake.received_browser_type_text).to eq("super-secret-value")
-    text = response["result"]["content"].as_a.first["text"].as_s
-    expect(text).to eq("typed «REDACTED»")
-    w[:client_in_w].close
-  end
-
-  it "returns an isError result when op resolution fails" do
+  it "lists the items usable on the current page" do
     w = wired
     FakeUpstream.new(w[:fake_transport]).serve
     spawn { build_proxy(w[:client_side], w[:upstream_side]).run }
 
-    call = %({"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"browser_type_secret","arguments":{"element":"Password","ref":"e1","vault":"missing","item":"item","field":"field"}}})
-    w[:driver].write(JSON.parse(call))
-    response = w[:driver].read || raise("no response")
-
-    expect(response["result"]["isError"].as_bool).to be_true
-    w[:client_in_w].close
-  end
-
-  it "finds items by the url argument" do
-    w = wired
-    FakeUpstream.new(w[:fake_transport]).serve
-    spawn { build_proxy(w[:client_side], w[:upstream_side]).run }
-
-    call = %({"jsonrpc":"2.0","id":12,"method":"tools/call","params":{"name":"browser_find_secret_by_url","arguments":{"url":"https://example.com/login"}}})
+    call = %({"jsonrpc":"2.0","id":12,"method":"tools/call","params":{"name":"browser_list_items","arguments":{}}})
     w[:driver].write(JSON.parse(call))
     response = w[:driver].read || raise("no response")
 
@@ -150,20 +146,22 @@ Spectator.describe PlaywrightSecureMcp::Proxy do
     expect(response["result"]["isError"].as_bool).to be_false
     payload = JSON.parse(response["result"]["content"].as_a.first["text"].as_s)
     expect(payload.as_a.first["item"].as_s).to eq("login1")
+    labels = payload.as_a.first["fields"].as_a.map(&.["label"].as_s)
+    expect(labels.includes?("password")).to be_true
     w[:client_in_w].close
   end
 
-  it "returns an isError result instead of hanging when a forwarded upstream call never answers" do
+  it "returns no items when the current page matches none" do
     w = wired
-    FakeUpstream.new(w[:fake_transport], type_hang: true).serve
-    spawn { build_proxy(w[:client_side], w[:upstream_side], upstream_timeout: 200.milliseconds).run }
+    FakeUpstream.new(w[:fake_transport], page_url: "https://other.com/").serve
+    spawn { build_proxy(w[:client_side], w[:upstream_side]).run }
 
-    call = %({"jsonrpc":"2.0","id":14,"method":"tools/call","params":{"name":"browser_type_secret","arguments":{"element":"Password","ref":"e1","vault":"ok","item":"item","field":"field"}}})
+    call = %({"jsonrpc":"2.0","id":15,"method":"tools/call","params":{"name":"browser_list_items","arguments":{}}})
     w[:driver].write(JSON.parse(call))
     response = w[:driver].read || raise("no response")
 
-    expect(response["id"].as_i).to eq(14)
-    expect(response["result"]["isError"].as_bool).to be_true
+    payload = JSON.parse(response["result"]["content"].as_a.first["text"].as_s)
+    expect(payload.as_a.empty?).to be_true
     w[:client_in_w].close
   end
 
@@ -172,12 +170,136 @@ Spectator.describe PlaywrightSecureMcp::Proxy do
     FakeUpstream.new(w[:fake_transport]).serve
     spawn { build_proxy(w[:client_side], w[:upstream_side]).run }
 
-    call = %({"jsonrpc":"2.0","id":13,"method":"tools/call","params":{"name":"browser_find_secret_by_name","arguments":{"item":"Netflix"}}})
+    call = %({"jsonrpc":"2.0","id":13,"method":"tools/call","params":{"name":"browser_find_items_by_name","arguments":{"item":"Example"}}})
     w[:driver].write(JSON.parse(call))
     response = w[:driver].read || raise("no response")
 
     payload = JSON.parse(response["result"]["content"].as_a.first["text"].as_s)
-    expect(payload.as_a.first["item"].as_s).to eq("item1")
+    expect(payload.as_a.first["item"].as_s).to eq("login1")
+    w[:client_in_w].close
+  end
+
+  it "types a cached field, redacting the echoed value" do
+    w = wired
+    fake = FakeUpstream.new(w[:fake_transport])
+    fake.serve
+    spawn { build_proxy(w[:client_side], w[:upstream_side]).run }
+
+    list_call = %({"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"browser_list_items","arguments":{}}})
+    w[:driver].write(JSON.parse(list_call))
+    w[:driver].read || raise("no response")
+
+    call = %({"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"browser_type_secret","arguments":{"element":"Password","ref":"e1","vault":"v1","item":"login1","field":"password"}}})
+    w[:driver].write(JSON.parse(call))
+    response = w[:driver].read || raise("no response")
+
+    expect(fake.received_browser_type_text).to eq("pw")
+    text = response["result"]["content"].as_a.first["text"].as_s
+    expect(text).to eq("typed «REDACTED»")
+    w[:client_in_w].close
+  end
+
+  it "reveals the item on demand when it is not cached yet" do
+    w = wired
+    fake = FakeUpstream.new(w[:fake_transport])
+    fake.serve
+    spawn { build_proxy(w[:client_side], w[:upstream_side]).run }
+
+    call = %({"jsonrpc":"2.0","id":8,"method":"tools/call","params":{"name":"browser_type_secret","arguments":{"element":"Password","ref":"e1","vault":"v1","item":"login1","field":"password"}}})
+    w[:driver].write(JSON.parse(call))
+    response = w[:driver].read || raise("no response")
+
+    expect(fake.received_browser_type_text).to eq("pw")
+    expect(response["result"]["isError"].as_bool).to be_false
+    w[:client_in_w].close
+  end
+
+  it "refuses to type when the current page is not in the item's URL set" do
+    w = wired
+    fake = FakeUpstream.new(w[:fake_transport], page_url: "https://evil.com/")
+    fake.serve
+    spawn { build_proxy(w[:client_side], w[:upstream_side]).run }
+
+    call = %({"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"browser_type_secret","arguments":{"element":"Password","ref":"e1","vault":"v1","item":"login1","field":"password"}}})
+    w[:driver].write(JSON.parse(call))
+    response = w[:driver].read || raise("no response")
+
+    expect(response["result"]["isError"].as_bool).to be_true
+    expect(fake.received_browser_type_text.nil?).to be_true
+    w[:client_in_w].close
+  end
+
+  it "fails closed when the current page URL is unavailable" do
+    w = wired
+    fake = FakeUpstream.new(w[:fake_transport], evaluate_blank: true)
+    fake.serve
+    spawn { build_proxy(w[:client_side], w[:upstream_side]).run }
+
+    call = %({"jsonrpc":"2.0","id":17,"method":"tools/call","params":{"name":"browser_type_secret","arguments":{"element":"Password","ref":"e1","vault":"v1","item":"login1","field":"password"}}})
+    w[:driver].write(JSON.parse(call))
+    response = w[:driver].read || raise("no response")
+
+    expect(response["result"]["isError"].as_bool).to be_true
+    expect(fake.received_browser_type_text.nil?).to be_true
+    w[:client_in_w].close
+  end
+
+  it "returns an isError result when the item cannot be revealed" do
+    w = wired
+    FakeUpstream.new(w[:fake_transport]).serve
+    spawn { build_proxy(w[:client_side], w[:upstream_side]).run }
+
+    call = %({"jsonrpc":"2.0","id":10,"method":"tools/call","params":{"name":"browser_type_secret","arguments":{"element":"Password","ref":"e1","vault":"v1","item":"missing","field":"password"}}})
+    w[:driver].write(JSON.parse(call))
+    response = w[:driver].read || raise("no response")
+
+    expect(response["result"]["isError"].as_bool).to be_true
+    w[:client_in_w].close
+  end
+
+  it "clears the item cache when the client closes the browser" do
+    w = wired
+    fake = FakeUpstream.new(w[:fake_transport])
+    fake.serve
+    spawn { build_proxy(w[:client_side], w[:upstream_side]).run }
+
+    # Populate the cache: the typed secret "pw" is now known and guarded.
+    secret_call = %({"jsonrpc":"2.0","id":16,"method":"tools/call","params":{"name":"browser_type_secret","arguments":{"element":"Password","ref":"e1","vault":"v1","item":"login1","field":"password"}}})
+    w[:driver].write(JSON.parse(secret_call))
+    w[:driver].read || raise("no response")
+
+    close_call = %({"jsonrpc":"2.0","id":17,"method":"tools/call","params":{"name":"browser_close","arguments":{}}})
+    w[:driver].write(JSON.parse(close_call))
+    close_response = w[:driver].read || raise("no response")
+
+    # The close is forwarded to the upstream and its reply flows back.
+    expect(fake.received_close?).to be_true
+    expect(close_response["id"].as_i).to eq(17)
+    expect(close_response["result"]["isError"].as_bool).to be_false
+
+    # The cache is gone: the literal "pw" is no longer a known secret, so the
+    # guard forwards it and the redactor no longer masks the upstream echo.
+    type_call = %({"jsonrpc":"2.0","id":18,"method":"tools/call","params":{"name":"browser_type","arguments":{"target":"e1","text":"pw"}}})
+    w[:driver].write(JSON.parse(type_call))
+    type_response = w[:driver].read || raise("no response")
+
+    expect(type_response["result"]["isError"].as_bool).to be_false
+    expect(fake.received_browser_type_text).to eq("pw")
+    expect(type_response["result"]["content"].as_a.first["text"].as_s).to eq("typed pw")
+    w[:client_in_w].close
+  end
+
+  it "returns an isError result instead of hanging when a forwarded upstream call never answers" do
+    w = wired
+    FakeUpstream.new(w[:fake_transport], type_hang: true).serve
+    spawn { build_proxy(w[:client_side], w[:upstream_side], upstream_timeout: 200.milliseconds).run }
+
+    call = %({"jsonrpc":"2.0","id":14,"method":"tools/call","params":{"name":"browser_type_secret","arguments":{"element":"Password","ref":"e1","vault":"v1","item":"login1","field":"password"}}})
+    w[:driver].write(JSON.parse(call))
+    response = w[:driver].read || raise("no response")
+
+    expect(response["id"].as_i).to eq(14)
+    expect(response["result"]["isError"].as_bool).to be_true
     w[:client_in_w].close
   end
 
@@ -191,8 +313,8 @@ Spectator.describe PlaywrightSecureMcp::Proxy do
 
     instructions = response["result"]["instructions"].as_s
     expect(instructions.includes?("browser_type_secret")).to be_true
-    expect(instructions.includes?("browser_find_secret_by_url")).to be_true
-    expect(instructions.includes?("field")).to be_true
+    expect(instructions.includes?("browser_list_items")).to be_true
+    expect(instructions.includes?("browser_close")).to be_true
     w[:client_in_w].close
   end
 
@@ -211,17 +333,17 @@ Spectator.describe PlaywrightSecureMcp::Proxy do
     w[:client_in_w].close
   end
 
-  it "rejects a browser_type call carrying a known resolved secret" do
+  it "rejects a browser_type call carrying a known revealed secret" do
     w = wired
     fake = FakeUpstream.new(w[:fake_transport])
     fake.serve
     spawn { build_proxy(w[:client_side], w[:upstream_side]).run }
 
-    secret_call = %({"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"browser_type_secret","arguments":{"element":"Password","ref":"e1","vault":"ok","item":"item","field":"field"}}})
+    secret_call = %({"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"browser_type_secret","arguments":{"element":"Password","ref":"e1","vault":"v1","item":"login1","field":"password"}}})
     w[:driver].write(JSON.parse(secret_call))
     w[:driver].read || raise("no response")
 
-    leak_call = %({"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"browser_type","arguments":{"target":"e1","text":"super-secret-value"}}})
+    leak_call = %({"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"browser_type","arguments":{"target":"e1","text":"pw"}}})
     w[:driver].write(JSON.parse(leak_call))
     response = w[:driver].read || raise("no response")
 
@@ -238,7 +360,7 @@ Spectator.describe PlaywrightSecureMcp::Proxy do
     FakeUpstream.new(w[:fake_transport], fail: true).serve
     spawn { build_proxy(w[:client_side], w[:upstream_side]).run }
 
-    call = %({"jsonrpc":"2.0","id":11,"method":"tools/call","params":{"name":"browser_type_secret","arguments":{"element":"Password","ref":"e1","vault":"ok","item":"item","field":"field"}}})
+    call = %({"jsonrpc":"2.0","id":11,"method":"tools/call","params":{"name":"browser_type_secret","arguments":{"element":"Password","ref":"e1","vault":"v1","item":"login1","field":"password"}}})
     w[:driver].write(JSON.parse(call))
     response = w[:driver].read || raise("no response")
 
@@ -246,7 +368,7 @@ Spectator.describe PlaywrightSecureMcp::Proxy do
     messages = backend.entries.map(&.message)
     expect(messages.any?(&.includes?("browser_type"))).to be_true
     expect(messages.any?(&.includes?(PlaywrightSecureMcp::Redactor::TOKEN))).to be_true
-    expect(messages.none?(&.includes?("super-secret-value"))).to be_true
+    expect(messages.none?(&.includes?(%("text":"pw")))).to be_true
     w[:client_in_w].close
   end
 

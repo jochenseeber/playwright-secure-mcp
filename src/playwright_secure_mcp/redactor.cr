@@ -2,18 +2,18 @@ require "base64"
 require "uri"
 require "html"
 require "json"
-require "./secret_vault"
+require "./item_cache"
 
 module PlaywrightSecureMcp
   class Redactor
     TOKEN = "«REDACTED»"
 
-    def initialize(@vault : SecretVault)
+    def initialize(@cache : ItemCache)
     end
 
     def redact(text : String) : String
       result = text
-      @vault.each_plaintext do |secret|
+      @cache.each_plaintext do |secret|
         variants(secret).each do |variant|
           result = result.gsub(variant, TOKEN)
         end
