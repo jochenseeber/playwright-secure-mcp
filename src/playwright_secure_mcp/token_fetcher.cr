@@ -1,4 +1,5 @@
 require "json"
+require "./op_item"
 require "./op_runner"
 
 module PlaywrightSecureMcp
@@ -9,6 +10,13 @@ module PlaywrightSecureMcp
     class Error < Exception
     end
 
+    # Minimal DTO for one `op item list` entry; the fetcher reads only the id,
+    # so no other key is required.
+    private struct ListedItem
+      include JSON::Serializable
+      getter id : String
+    end
+
     def initialize(*, @op_command : String, @account : String?)
     end
 
@@ -17,18 +25,23 @@ module PlaywrightSecureMcp
     end
 
     private def item_id(tag : String) : String
-      items = JSON.parse(run(["item", "list", "--tags", tag, "--format=json"])).as_a
+      items = Array(ListedItem).from_json(run(["item", "list", "--tags", tag, "--format=json"]))
       raise Error.new("no 1Password item tagged #{tag}") if items.empty?
 
-      items[0]["id"].as_s
+      items[0].id
+    rescue error : JSON::ParseException | JSON::SerializableError
+      raise Error.new("op item list returned malformed JSON: #{error.message}")
     end
 
     private def credential(id : String) : String
-      fields = JSON.parse(run(["item", "get", id, "--fields", "label=credential", "--reveal", "--format=json"])).as_a
-      field = fields.find { |candidate| candidate["label"]? == "credential" || candidate["id"]? == "credential" }
+      fields = Array(OpField).from_json(run(["item", "get", id, "--fields", "label=credential", "--reveal", "--format=json"]))
+      field = fields.find { |candidate| candidate.label == "credential" || candidate.id == "credential" }
       raise Error.new("no credential field on 1Password item #{id}") unless field
-
-      field["value"].as_s
+      value = field.value
+      raise Error.new("credential field on 1Password item #{id} has no value") if value.nil?
+      value
+    rescue error : JSON::ParseException | JSON::SerializableError
+      raise Error.new("op item get returned malformed JSON: #{error.message}")
     end
 
     private def run(arguments : Array(String)) : String

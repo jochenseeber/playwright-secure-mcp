@@ -1,4 +1,5 @@
 require "json"
+require "./op_account"
 require "./op_runner"
 
 module PlaywrightSecureMcp
@@ -19,11 +20,13 @@ module PlaywrightSecureMcp
       return account unless account
       return account unless account.includes?('@')
 
-      accounts = JSON.parse(run).as_a
-      match = accounts.find { |candidate| candidate["email"]? == account }
+      accounts = Array(OpAccount).from_json(run)
+      match = accounts.find { |candidate| candidate.email == account }
       raise Error.new("no 1Password account for email #{account}") unless match
 
-      match["account_uuid"].as_s
+      match.account_uuid
+    rescue error : JSON::ParseException | JSON::SerializableError
+      raise Error.new("op account list returned malformed JSON: #{error.message}")
     end
 
     private def run : String
