@@ -5,6 +5,25 @@ require "./item_locator"
 require "./website_matcher"
 
 module PlaywrightSecureMcp
+  # Typed views of the finder tool-call arguments. Wire shape only; empty-string
+  # normalization stays in the finders.
+  private struct NameArgs
+    include JSON::Serializable
+    getter item : String
+    getter vault : String?
+  end
+
+  private struct TagArgs
+    include JSON::Serializable
+    getter tag : String
+    getter vault : String?
+  end
+
+  private struct ScopeArgs
+    include JSON::Serializable
+    getter vault : String?
+  end
+
   # A discovery tool that returns the LOGIN items usable on the current browser
   # page, revealing and caching any that are not already cached.
   abstract class ItemFinder
@@ -30,15 +49,9 @@ module PlaywrightSecureMcp
       @website_matcher.rank(page_url, fetched)
     end
 
-    protected def required_string(arguments : JSON::Any, key : String) : String
-      value = arguments[key]?.try(&.as_s?)
-      raise MissingArgumentError.new("#{key} is required") if value.nil? || value.empty?
-      value
-    end
-
-    protected def optional_string(arguments : JSON::Any, key : String) : String?
-      value = arguments[key]?.try(&.as_s?)
-      value.nil? || value.empty? ? nil : value
+    # An absent or empty vault argument means "search all vaults".
+    protected def scoped_vault(vault : String?) : String?
+      vault.nil? || vault.empty? ? nil : vault
     end
   end
 
@@ -63,7 +76,14 @@ module PlaywrightSecureMcp
     end
 
     def find(page_url : String, arguments : JSON::Any) : Array(Item)
-      resolve(page_url, @item_locator.list_logins(optional_string(arguments, "vault")))
+      parsed = parse(arguments)
+      resolve(page_url, @item_locator.list_logins(scoped_vault(parsed.vault)))
+    end
+
+    private def parse(arguments : JSON::Any) : ScopeArgs
+      ScopeArgs.from_json(arguments.to_json)
+    rescue error : JSON::ParseException | JSON::SerializableError
+      raise MissingArgumentError.new("invalid #{NAME} arguments: #{error.message}")
     end
   end
 
@@ -88,11 +108,19 @@ module PlaywrightSecureMcp
     end
 
     def find(page_url : String, arguments : JSON::Any) : Array(Item)
-      needle = required_string(arguments, "item")
+      parsed = parse(arguments)
+      needle = parsed.item
+      raise MissingArgumentError.new("item is required") if needle.empty?
       lowered = needle.downcase
-      candidates = @item_locator.list_logins(optional_string(arguments, "vault"))
+      candidates = @item_locator.list_logins(scoped_vault(parsed.vault))
       named = candidates.select { |candidate| candidate.item_id == needle || candidate.title.downcase.includes?(lowered) }
       resolve(page_url, named)
+    end
+
+    private def parse(arguments : JSON::Any) : NameArgs
+      NameArgs.from_json(arguments.to_json)
+    rescue error : JSON::ParseException | JSON::SerializableError
+      raise MissingArgumentError.new("invalid #{NAME} arguments: #{error.message}")
     end
   end
 
@@ -117,8 +145,16 @@ module PlaywrightSecureMcp
     end
 
     def find(page_url : String, arguments : JSON::Any) : Array(Item)
-      tag = required_string(arguments, "tag")
-      resolve(page_url, @item_locator.list_by_tag(tag, optional_string(arguments, "vault")))
+      parsed = parse(arguments)
+      tag = parsed.tag
+      raise MissingArgumentError.new("tag is required") if tag.empty?
+      resolve(page_url, @item_locator.list_by_tag(tag, scoped_vault(parsed.vault)))
+    end
+
+    private def parse(arguments : JSON::Any) : TagArgs
+      TagArgs.from_json(arguments.to_json)
+    rescue error : JSON::ParseException | JSON::SerializableError
+      raise MissingArgumentError.new("invalid #{NAME} arguments: #{error.message}")
     end
   end
 end

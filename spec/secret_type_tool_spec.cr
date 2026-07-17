@@ -22,18 +22,19 @@ Spectator.describe PlaywrightSecureMcp::SecretTypeTool do
   end
 
   it "builds an ItemKey from vault and item" do
-    key = tool.key(args({"vault" => "v1", "item" => "i1", "field" => "password"}))
+    key = tool.key(args({"element" => "Password", "ref" => "e1", "vault" => "v1", "item" => "i1", "field" => "password"}))
     expect(key.vault_id).to eq("v1")
     expect(key.item_id).to eq("i1")
   end
 
   it "extracts the field name" do
-    expect(tool.field_name(args({"vault" => "v", "item" => "i", "field" => "password"}))).to eq("password")
+    expect(tool.field_name(args({"element" => "Password", "ref" => "e1", "vault" => "v", "item" => "i", "field" => "password"}))).to eq("password")
   end
 
   it "builds browser_type arguments with the secret and passes options through" do
     built = tool.build_browser_type_arguments(
-      arguments: args({"element" => "Password", "ref" => "e1", "submit" => true}),
+      arguments: args({"element" => "Password", "ref" => "e1", "vault" => "v1", "item" => "i1",
+                       "field" => "password", "submit" => true}),
       secret: "s3cr3t")
     expect(built["element"].as_s).to eq("Password")
     expect(built["target"].as_s).to eq("e1")

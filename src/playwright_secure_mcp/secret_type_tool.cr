@@ -1,5 +1,6 @@
 require "json"
 require "./item"
+require "./secret_type_arguments"
 
 module PlaywrightSecureMcp
   class SecretTypeTool
@@ -40,38 +41,32 @@ module PlaywrightSecureMcp
     end
 
     def key(arguments : JSON::Any) : ItemKey
-      ItemKey.new(vault_id: fetch_string(arguments, "vault"), item_id: fetch_string(arguments, "item"))
+      parsed = parse(arguments)
+      ItemKey.new(vault_id: parsed.vault, item_id: parsed.item)
     end
 
     def field_name(arguments : JSON::Any) : String
-      fetch_string(arguments, "field")
+      parse(arguments).field
     end
 
     def build_browser_type_arguments(*, arguments : JSON::Any, secret : String) : JSON::Any
-      built = {} of String => JSON::Any
-      built["element"] = required_string(arguments, "element")
-      built["target"] = required_string(arguments, "ref")
-      built["text"] = JSON::Any.new(secret)
-      copy_optional(arguments, built, "submit")
-      copy_optional(arguments, built, "slowly")
+      parsed = parse(arguments)
+      built = {
+        "element" => JSON::Any.new(parsed.element),
+        "target"  => JSON::Any.new(parsed.ref),
+        "text"    => JSON::Any.new(secret),
+      } of String => JSON::Any
+      submit = parsed.submit
+      built["submit"] = JSON::Any.new(submit) unless submit.nil?
+      slowly = parsed.slowly
+      built["slowly"] = JSON::Any.new(slowly) unless slowly.nil?
       JSON::Any.new(built)
     end
 
-    private def required_string(arguments : JSON::Any, key : String) : JSON::Any
-      value = arguments[key]?.try(&.as_s?)
-      raise MissingArgumentError.new("#{key} is required") if value.nil?
-      JSON::Any.new(value)
-    end
-
-    private def fetch_string(arguments : JSON::Any, key : String) : String
-      value = arguments[key]?.try(&.as_s?)
-      raise MissingArgumentError.new("#{key} is required") if value.nil? || value.empty?
-      value
-    end
-
-    private def copy_optional(arguments : JSON::Any, target : Hash(String, JSON::Any), key : String) : Nil
-      value = arguments[key]?
-      target[key] = value unless value.nil?
+    private def parse(arguments : JSON::Any) : SecretTypeArguments
+      SecretTypeArguments.from_json(arguments.to_json)
+    rescue error : JSON::ParseException | JSON::SerializableError
+      raise MissingArgumentError.new("invalid browser_type_secret arguments: #{error.message}")
     end
   end
 end
