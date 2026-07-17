@@ -33,4 +33,26 @@ Spectator.describe PlaywrightSecureMcp::Redactor do
     cache.add_loose_secret("secret")
     expect(redactor.redact("nothing to see")).to eq("nothing to see")
   end
+
+  it "redacts within JSON string leaves and keeps the structure valid" do
+    cache.add_loose_secret("hunter2")
+    message = JSON.parse(%({"id":1,"result":{"content":[{"text":"pw=hunter2"},{"text":"safe"}]}}))
+    redacted = redactor.redact(message)
+    # Re-serializing still yields parseable JSON, and the leaf secret is gone.
+    reparsed = JSON.parse(redacted.to_json)
+    expect(reparsed["result"]["content"].as_a.first["text"].as_s).to eq("pw=«REDACTED»")
+    expect(reparsed["id"].as_i).to eq(1)
+  end
+
+  it "does not corrupt JSON when a cached secret is a structural character" do
+    # A short/structural field value (e.g. a test password of ",") must not
+    # turn a client-bound response into unparseable JSON — that desyncs the
+    # client's stream and wedges every later call.
+    cache.add_loose_secret(",")
+    message = JSON.parse(%({"id":7,"result":[{"item":"a"},{"item":"b"}]}))
+    redacted = redactor.redact(message)
+    reparsed = JSON.parse(redacted.to_json) # must not raise
+    expect(reparsed["result"].as_a.map(&.["item"].as_s)).to eq(["a", "b"])
+    expect(reparsed["id"].as_i).to eq(7)
+  end
 end

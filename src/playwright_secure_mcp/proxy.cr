@@ -258,8 +258,8 @@ module PlaywrightSecureMcp
     private def log_upstream_failure(arguments : JSON::Any, response : JSON::Any) : Nil
       Log.warn do
         "upstream #{SecretTypeTool::UPSTREAM_TOOL} call failed; " \
-        "arguments=#{@redactor.redact(arguments.to_json)} " \
-        "response=#{@redactor.redact(response.to_json)}"
+        "arguments=#{@redactor.redact(arguments).to_json} " \
+        "response=#{@redactor.redact(response).to_json}"
       end
     end
 
@@ -337,7 +337,7 @@ module PlaywrightSecureMcp
     end
 
     private def send_to_client(message : JSON::Any) : Nil
-      @client.write_raw(@redactor.redact(message.to_json))
+      @client.write_raw(@redactor.redact(message).to_json)
     end
   end
 end
