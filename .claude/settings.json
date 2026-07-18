@@ -1,13 +1,4 @@
 {
-  "permissions": {
-    "allow": [
-      "WebFetch(domain:api.github.com)",
-      "mcp__plugin_claude-mem_mcp-search__get_observations",
-      "mcp__playwright-secure__browser_list_items",
-      "mcp__playwright-secure__browser_find_items_by_name",
-      "mcp__playwright-secure__browser_find_items_by_tag"
-    ]
-  },
   "enabledPlugins": {
     "claude-code-setup@claude-plugins-official": true,
     "claude-md-management@claude-plugins-official": true,
@@ -23,18 +14,11 @@
     "allowUnsandboxedCommands": false,
     "network": {
       "allowedDomains": [
-        "caperwhite.1password.com",
-        "codeload.github.com",
-        "files.pythonhosted.org",
-        "github.com",
-        "objects.githubusercontent.com",
-        "pypi.org"
       ],
       "allowUnixSockets": [
         "~/Library/Group Containers/2BUA8C4S2C.com.1password/t/agent.sock",
         "~/Library/Group Containers/2BUA8C4S2C.com.1password/t/s.sock"
       ],
-      "allowAllUnixSockets": true,
       "allowMachLookup": [
         "2BUA8C4S2C.com.1password.*",
         "com.1password.*",
@@ -54,7 +38,10 @@
         "~/.serena"
       ],
       "denyRead": [
-        "~/"
+        "~/",
+        "~/.claude/.credentials.json",
+        "~/.claude/history.jsonl",
+        "~/.claude/projects"
       ],
       "allowRead": [
         ".",
@@ -62,6 +49,7 @@
         "~/.cache/rubocop_cache",
         "~/.cache/uv",
         "~/.claude",
+        "~/.claude/projects/-Users-jochen-Projects-playwright-secure-mcp",
         "~/.config/git",
         "~/.config/op",
         "~/.config/vsrun",
