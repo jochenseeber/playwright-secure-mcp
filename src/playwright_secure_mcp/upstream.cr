@@ -14,12 +14,20 @@ module PlaywrightSecureMcp
       process = Process.new(
         @tokens.first,
         @tokens[1..],
+        # Scrub verbose-logging vars so the child does not print typed values.
+        env: {"DEBUG" => nil, "PWDEBUG" => nil},
         input: Process::Redirect::Pipe,
         output: Process::Redirect::Pipe,
-        error: Process::Redirect::Inherit,
+        error: Process::Redirect::Pipe,
       )
       @process = process
       StdioTransport.new(input: process.output, output: process.input)
+    end
+
+    # The upstream child's stderr pipe (only after start). Callers MUST drain it
+    # or the child blocks once its stderr buffer fills.
+    def stderr : IO?
+      @process.try(&.error)
     end
 
     def stop : Nil

@@ -18,6 +18,7 @@ require "./page_url"
 require "./item_finders"
 require "./item_result"
 require "./secret_guard"
+require "./stderr_redactor"
 require "./proxy"
 
 module PlaywrightSecureMcp
@@ -47,11 +48,15 @@ module PlaywrightSecureMcp
         account: account,
         encryptor: cache,
       )
+      redactor = Redactor.new(cache)
       tokens = UpstreamCommand.new(configuration).tokens
       upstream_process = Upstream.new(tokens)
       upstream_transport = upstream_process.start
+      if stderr = upstream_process.stderr
+        StderrRedactor.new(stderr, redactor).start
+      end
       begin
-        build_proxy(upstream_transport, cache: cache, item_locator: item_locator).run
+        build_proxy(upstream_transport, cache: cache, item_locator: item_locator, redactor: redactor).run
       ensure
         upstream_process.stop
       end
@@ -67,7 +72,7 @@ module PlaywrightSecureMcp
       token
     end
 
-    private def build_proxy(upstream_transport : StdioTransport, *, cache : ItemCache, item_locator : ItemLocator) : Proxy
+    private def build_proxy(upstream_transport : StdioTransport, *, cache : ItemCache, item_locator : ItemLocator, redactor : Redactor) : Proxy
       finders = [
         ListItemsFinder.new(cache: cache, item_locator: item_locator, website_matcher: WebsiteMatcher.new),
         NameItemsFinder.new(cache: cache, item_locator: item_locator, website_matcher: WebsiteMatcher.new),
@@ -81,7 +86,7 @@ module PlaywrightSecureMcp
         field_selector: FieldSelector.new,
         page_url: PageUrl.new,
         website_matcher: WebsiteMatcher.new,
-        redactor: Redactor.new(cache),
+        redactor: redactor,
         secret_guard: SecretGuard.new(cache),
         secret_type_tool: SecretTypeTool.new,
         finders: finders,

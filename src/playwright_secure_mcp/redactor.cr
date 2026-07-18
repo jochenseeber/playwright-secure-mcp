@@ -39,6 +39,33 @@ module PlaywrightSecureMcp
       result
     end
 
+    # Formats an exception for a log line with any cached secret in its message
+    # masked. The class name and backtrace frames (file:line) carry no secret
+    # values; only the message is redacted.
+    def redact_exception(error : Exception) : String
+      message = redact(error.message || "")
+      backtrace = error.backtrace?.try(&.join("\n"))
+      if backtrace
+        "#{error.class}: #{message}\n#{backtrace}"
+      else
+        "#{error.class}: #{message}"
+      end
+    end
+
+    # The longest redactable form of any cached secret, in characters. A
+    # consumer that redacts a stream in bounded chunks uses this to size an
+    # overlap window, so a secret spanning a chunk boundary is never emitted
+    # split below the length at which the redactor could still match it.
+    def max_secret_length : Int32
+      longest = 0
+      @cache.each_plaintext do |secret|
+        variants(secret).each do |variant|
+          longest = variant.size if variant.size > longest
+        end
+      end
+      longest
+    end
+
     private def variants(secret : String) : Array(String)
       json_escaped = secret.to_json[1..-2]
       candidates = [

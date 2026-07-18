@@ -188,7 +188,7 @@ module PlaywrightSecureMcp
     rescue error : Exception
       # An uncaught handler exception would kill this fiber silently and leave
       # the client waiting forever. Always answer the request instead.
-      Log.error(exception: error) { "unexpected error handling #{finder.name}" }
+      Log.error { "unexpected error handling #{finder.name}: #{@redactor.redact_exception(error)}" }
       send_to_client(error_result(message["id"], "item lookup failed: #{error.message}"))
     end
 
@@ -220,7 +220,7 @@ module PlaywrightSecureMcp
     rescue error : Exception
       # An uncaught handler exception would kill this fiber silently and leave
       # the client waiting forever. Always answer the request instead.
-      Log.error(exception: error) { "unexpected error handling secret call" }
+      Log.error { "unexpected error handling secret call: #{@redactor.redact_exception(error)}" }
       send_to_client(error_result(message["id"], "secret typing failed: #{error.message}"))
     end
 

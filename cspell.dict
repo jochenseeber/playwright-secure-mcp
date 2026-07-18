@@ -9,6 +9,7 @@ codesign
 codesigned
 crystallang
 desynchronizes
+desyncs
 dpreview
 ecies
 elif
@@ -44,9 +45,13 @@ pcre
 pipefail
 playwright
 privatevault
+pwdebug
 rakefile
 rakelib
 rchop
+readback
+redactable
+reparsed
 rubocop
 sekret
 softprops
@@ -57,6 +62,8 @@ tempname
 tpmrm
 ulimits
 unparseable
+unredacted
+unsets
 urlsafe
 worktrees
 xcrun

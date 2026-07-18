@@ -44,6 +44,21 @@ Spectator.describe PlaywrightSecureMcp::Redactor do
     expect(reparsed["id"].as_i).to eq(1)
   end
 
+  it "redacts a cached secret in an exception message, keeping class and backtrace" do
+    cache.add_loose_secret("hunter2")
+    error =
+      begin
+        raise "login failed for token=hunter2"
+      rescue ex
+        ex
+      end
+    result = redactor.redact_exception(error)
+    expect(result.includes?("«REDACTED»")).to be_true
+    expect(result.includes?("hunter2")).to be_false
+    expect(result.includes?("Exception")).to be_true             # the class
+    expect(result.includes?("spec/redactor_spec.cr")).to be_true # a backtrace frame
+  end
+
   it "does not corrupt JSON when a cached secret is a structural character" do
     # A short/structural field value (e.g. a test password of ",") must not
     # turn a client-bound response into unparseable JSON — that desyncs the
@@ -54,5 +69,15 @@ Spectator.describe PlaywrightSecureMcp::Redactor do
     reparsed = JSON.parse(redacted.to_json) # must not raise
     expect(reparsed["result"].as_a.map(&.["item"].as_s)).to eq(["a", "b"])
     expect(reparsed["id"].as_i).to eq(7)
+  end
+
+  it "reports the longest redactable encoding of the cached secrets" do
+    cache.add_loose_secret("ab") # base64 "YWI=" -> 4 chars, the longest form
+    cache.add_loose_secret("x")  # shorter
+    expect(redactor.max_secret_length).to eq(4)
+  end
+
+  it "reports zero when no secrets are cached" do
+    expect(PlaywrightSecureMcp::Redactor.new(PlaywrightSecureMcp::ItemCache.new).max_secret_length).to eq(0)
   end
 end
