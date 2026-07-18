@@ -1,0 +1,23 @@
+# Dependabot version updates.
+# Crystal shards are not a supported ecosystem, so shard.yml is not tracked.
+version: 2
+updates:
+  # GitHub Actions used by the CI and release workflows.
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+
+  # Ruby development tooling (rake, rspec, rubocop, ruby-lsp, ...).
+  - package-ecosystem: bundler
+    directory: "/"
+    schedule:
+      interval: weekly
+    groups:
+      ruby-tooling:
+        patterns:
+          - "*"
