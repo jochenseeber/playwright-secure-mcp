@@ -2,8 +2,8 @@ require "uri"
 require "./item"
 
 module PlaywrightSecureMcp
-  # Ranks 1Password items by how well their URLs match a page URL, mirroring the
-  # 1Password browser extension's domain matching without a Public Suffix List.
+  # Ranks 1Password items by how well their URLs match a page URL, requiring an
+  # exact normalized host and, when the item URL specifies one, a matching port.
   class WebsiteMatcher
     private record ScoredItem, item : Item, score : Int32
     private record UrlMatch, url : String, score : Int32
@@ -16,7 +16,7 @@ module PlaywrightSecureMcp
 
       scored = [] of ScoredItem
       items.each do |item|
-        match = best_match(item, page_host, page_path)
+        match = best_match(item, page, page_host, page_path)
         scored << ScoredItem.new(item: prioritize_url(item, match.url), score: match.score) unless match.nil?
       end
       scored.sort_by! { |entry| -entry.score }
@@ -33,17 +33,19 @@ module PlaywrightSecureMcp
       item.urls.any? do |raw|
         candidate = parse_url(raw)
         next false if candidate.nil?
-        next false unless same_site?(normalize_host(candidate.host), page_host)
+        next false unless host_matches?(normalize_host(candidate.host), page_host)
+        next false unless port_matches?(candidate, page)
         path_matches?(candidate.path, page_path)
       end
     end
 
-    private def best_match(item : Item, page_host : String, page_path : String) : UrlMatch?
+    private def best_match(item : Item, page : URI, page_host : String, page_path : String) : UrlMatch?
       best = nil
       item.urls.each do |raw|
         candidate = parse_url(raw)
         next if candidate.nil?
-        next unless same_site?(normalize_host(candidate.host), page_host)
+        next unless host_matches?(normalize_host(candidate.host), page_host)
+        next unless port_matches?(candidate, page)
         score = path_score(candidate.path, page_path)
         best = UrlMatch.new(url: raw, score: score) if best.nil? || score > best.score
       end
@@ -72,17 +74,28 @@ module PlaywrightSecureMcp
     end
 
     private def normalize_host(host : String?) : String
-      value = (host || "").downcase
-      value = value["www.".size..] if value.starts_with?("www.")
-      value
+      (host || "").downcase.rchop('.')
     end
 
-    private def same_site?(host : String, page_host : String) : Bool
+    private def host_matches?(host : String, page_host : String) : Bool
       return false if host.empty? || page_host.empty?
-      equal = host == page_host
-      page_is_subdomain = page_host.ends_with?(".#{host}")
-      item_is_subdomain = host.ends_with?(".#{page_host}")
-      equal || page_is_subdomain || item_is_subdomain
+      host == page_host
+    end
+
+    # An item url with an explicit port constrains the page to that port; the
+    # page's effective port is its explicit port or the scheme default.
+    private def port_matches?(candidate : URI, page : URI) : Bool
+      item_port = candidate.port
+      return true if item_port.nil?
+      item_port == (page.port || default_port(page.scheme))
+    end
+
+    private def default_port(scheme : String?) : Int32?
+      case scheme
+      when "https" then 443
+      when "http"  then 80
+      else              nil
+      end
     end
 
     # Matches only on a path-segment boundary, so "/admin" matches

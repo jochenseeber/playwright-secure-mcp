@@ -20,6 +20,7 @@ gsub
 hexdigest
 hexstring
 homebrew
+idna
 jochenseeber
 kcov
 laverdet
@@ -38,12 +39,14 @@ onepassword
 osname
 ostype
 ostypes
+overbroad
 pcre
 pipefail
 playwright
 privatevault
 rakefile
 rakelib
+rchop
 rubocop
 sekret
 softprops
@@ -53,6 +56,7 @@ teamid
 tempname
 tpmrm
 ulimits
+unparseable
 urlsafe
 worktrees
 xcrun
