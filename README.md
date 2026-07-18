@@ -3,7 +3,7 @@
 A Crystal MCP server that transparently proxies the upstream
 [Playwright MCP server](https://github.com/microsoft/playwright-mcp)
 (`@playwright/mcp`) and adds secure password handling. Its goal: **a resolved
-secret value never reaches the LLM.**
+secret value never accidentally reaches the LLM.**
 
 ## How it works
 
