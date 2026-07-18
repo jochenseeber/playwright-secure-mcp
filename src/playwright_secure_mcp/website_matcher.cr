@@ -46,6 +46,7 @@ module PlaywrightSecureMcp
         next if candidate.nil?
         next unless host_matches?(normalize_host(candidate.host), page_host)
         next unless port_matches?(candidate, page)
+        next unless path_matches?(candidate.path, page_path)
         score = path_score(candidate.path, page_path)
         best = UrlMatch.new(url: raw, score: score) if best.nil? || score > best.score
       end

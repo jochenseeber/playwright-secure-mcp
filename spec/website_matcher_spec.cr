@@ -41,7 +41,13 @@ Spectator.describe PlaywrightSecureMcp::WebsiteMatcher do
   it "does not treat a partial path segment as a prefix match" do
     items = [item("admin", "https://example.com/admin"), item("root", "https://example.com/")]
     ranked = matcher.rank("https://example.com/administrator", items)
-    expect(ranked.map(&.item_id)).to eq(["root", "admin"])
+    # /admin does not match /administrator, so only the root item is surfaced.
+    expect(ranked.map(&.item_id)).to eq(["root"])
+  end
+
+  it "does not rank an item whose path does not match (consistent with matches?)" do
+    items = [item("app", "https://example.com/app")]
+    expect(matcher.rank("https://example.com/other", items)).to be_empty
   end
 
   it "matches an item url stored without a scheme" do
