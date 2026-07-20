@@ -48,7 +48,10 @@ module PlaywrightSecureMcp
                    "\"username\" or \"password\"); the secret value " \
                    "is resolved locally and never exposed, and " \
                    "typing is only allowed while the current page " \
-                   "is in the item's URL set. Closing the browser " \
+                   "is in the item's URL set. " \
+                   "A one-time-password (TOTP) field is typed the " \
+                   "same way; its code is fetched live from " \
+                   "1Password and never cached. Closing the browser " \
                    "with browser_close also drops the local item " \
                    "cache."
 
@@ -178,6 +181,7 @@ module PlaywrightSecureMcp
 
     private def handle_find(finder : ItemFinder, message : JSON::Any) : Nil
       original_id = message["id"]
+      @item_cache.purge_expired
       arguments = message.dig?("params", "arguments") || JSON::Any.new({} of String => JSON::Any)
       url = current_page_url
       items = finder.find(url, arguments)
@@ -206,9 +210,16 @@ module PlaywrightSecureMcp
       end
 
       field = @field_selector.select(item, @secret_type_tool.field_name(arguments))
-      value = field.value
-      raise FieldSelector::NotFoundError.new("field has no value") if value.nil?
-      secret = @item_cache.decrypt(value)
+      secret =
+        if field.type == ItemLocator::OTP_TYPE
+          code = @item_locator.one_time_password(item.key)
+          @item_cache.add_expiring_secret(code)
+          code
+        else
+          value = field.value
+          raise FieldSelector::NotFoundError.new("field has no value") if value.nil?
+          @item_cache.decrypt(value)
+        end
 
       browser_arguments = @secret_type_tool.build_browser_type_arguments(arguments: arguments, secret: secret)
       params = JSON::Any.new({"name" => JSON::Any.new(SecretTypeTool::UPSTREAM_TOOL), "arguments" => browser_arguments})
@@ -225,6 +236,7 @@ module PlaywrightSecureMcp
     end
 
     private def fetch_or_reveal(key : ItemKey) : Item?
+      @item_cache.purge_expired
       cached = @item_cache.fetch(key)
       return cached unless cached.nil?
       revealed = @item_locator.reveal([key]).first?

@@ -13,7 +13,7 @@ module PlaywrightSecureMcp
     DEFINITION_JSON = <<-JSON
       {
         "name": "browser_type_secret",
-        "description": "Type a secret from 1Password into an element. Provide vault, item (both 1Password IDs, e.g. from browser_list_items or browser_find_items_by_name/_by_tag) and field (e.g. \\"username\\" or \\"password\\"). Only allowed while the current page is in the item's URL set. The value is resolved locally and never exposed. Mirrors browser_type otherwise.",
+        "description": "Type a secret from 1Password into an element. Provide vault, item (both 1Password IDs, e.g. from browser_list_items or browser_find_items_by_name/_by_tag) and field (e.g. \\"username\\" or \\"password\\"). Only allowed while the current page is in the item's URL set. The value is resolved locally and never exposed. One-time-password (TOTP) fields are supported and fetched live. Mirrors browser_type otherwise.",
         "annotations": {
           "title": "Type secret into page",
           "readOnlyHint": false,

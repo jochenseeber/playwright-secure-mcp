@@ -94,4 +94,35 @@ Spectator.describe PlaywrightSecureMcp::ItemCache do
   it "raises when with_service_token is called with none stored" do
     expect { cache.with_service_token { |_| } }.to raise_error(PlaywrightSecureMcp::ItemCache::Error)
   end
+
+  it "redacts an expiring secret until it is purged past its ttl" do
+    now = Time.utc(2026, 1, 1, 0, 0, 0)
+    clock_cache = PlaywrightSecureMcp::ItemCache.new(clock: -> { now })
+    clock_cache.add_expiring_secret("otp-code")
+
+    present = [] of String
+    clock_cache.each_plaintext { |secret| present << secret }
+    expect(present).to eq(["otp-code"])
+
+    now = now + PlaywrightSecureMcp::ItemCache::OTP_TTL - 1.second
+    clock_cache.purge_expired
+    still = [] of String
+    clock_cache.each_plaintext { |secret| still << secret }
+    expect(still).to eq(["otp-code"])
+
+    now = now + 2.seconds # now past ttl
+    clock_cache.purge_expired
+    gone = [] of String
+    clock_cache.each_plaintext { |secret| gone << secret }
+    expect(gone).to be_empty
+  end
+
+  it "clear drops expiring secrets" do
+    dropped = PlaywrightSecureMcp::ItemCache.new
+    dropped.add_expiring_secret("otp-code")
+    dropped.clear
+    got = [] of String
+    dropped.each_plaintext { |secret| got << secret }
+    expect(got).to be_empty
+  end
 end

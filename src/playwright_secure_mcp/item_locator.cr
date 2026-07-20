@@ -21,6 +21,7 @@ module PlaywrightSecureMcp
     # are surfaced as metadata only, so their non-secret values never trigger
     # over-redaction of unrelated page content.
     CONCEALED_TYPE      = "CONCEALED"
+    OTP_TYPE            = "OTP"
     CREDENTIAL_PURPOSES = {"USERNAME", "PASSWORD"}
 
     def initialize(*, @op_command : String, @account : String?, @encryptor : ItemCache)
@@ -43,6 +44,15 @@ module PlaywrightSecureMcp
       specifiers = keys.map { |k| {"id" => k.item_id, "vault" => {"id" => k.vault_id}} }.to_json
       output = run(["item", "get", "-", "--reveal", "--format=json"], vault: nil, input: specifiers)
       op_items(output).select { |op| op.category == LOGIN_CATEGORY }.map { |op| full(op) }
+    end
+
+    # Fetches the item's current one-time password live. The code is a
+    # short-lived secret: it is never cached for reuse and never placed on a
+    # command line (op prints it to stdout).
+    def one_time_password(key : ItemKey) : String
+      code = run(["item", "get", key.item_id, "--otp"], vault: key.vault_id).strip
+      raise Error.new("op returned no one-time password for #{key.item_id}") if code.empty?
+      code
     end
 
     # Parse op's output: a single JSON array, or a stream of concatenated
@@ -143,6 +153,7 @@ module PlaywrightSecureMcp
     # returns nil so the value is neither typable nor redacted.
     private def cache_value(*, type : String, purpose : String?, value : String?) : EncryptedSecret?
       return nil if value.nil? || value.empty?
+      return nil if type == OTP_TYPE
       return nil unless type == CONCEALED_TYPE || (purpose && CREDENTIAL_PURPOSES.includes?(purpose))
       @encryptor.encrypt(value)
     end

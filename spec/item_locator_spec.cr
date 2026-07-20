@@ -25,7 +25,7 @@ Spectator.describe PlaywrightSecureMcp::ItemLocator do
     items = locator.reveal(keys)
     expect(items.map(&.item_id)).to eq(["login1"]) # non-login dropped
     fields = items.first.fields
-    expect(fields.size).to eq(3)
+    expect(fields.size).to eq(4)
     pw = fields.values.find! { |field| field.purpose == "PASSWORD" }
     value = pw.value
     expect(value).not_to be_nil
@@ -69,5 +69,21 @@ Spectator.describe PlaywrightSecureMcp::ItemLocator do
     expect(items.first.sections["sec1"].label).to eq("More")
     custom = items.first.fields["custom"]
     expect(custom.section_id).to eq("sec1")
+  end
+
+  it "does not cache the value of an OTP field" do
+    items = locator.reveal([PlaywrightSecureMcp::ItemKey.new(vault_id: "v1", item_id: "login1")])
+    expect(items.first.fields["otp"].type).to eq(PlaywrightSecureMcp::ItemLocator::OTP_TYPE)
+    expect(items.first.fields["otp"].value).to be_nil
+  end
+
+  it "fetches the current one-time password live" do
+    code = locator.one_time_password(PlaywrightSecureMcp::ItemKey.new(vault_id: "v1", item_id: "login1"))
+    expect(code).to eq("135790")
+  end
+
+  it "raises when op has no one-time password for the item" do
+    expect { locator.one_time_password(PlaywrightSecureMcp::ItemKey.new(vault_id: "v1", item_id: "missing")) }
+      .to raise_error(PlaywrightSecureMcp::ItemLocator::Error)
   end
 end

@@ -47,7 +47,7 @@ if [ "$1" = "item" ] && [ "$2" = "get" ] && [ "$3" = "-" ]; then
       ;;
     *login1*)
       # One login plus one non-login (must be dropped) -- concatenated objects.
-      printf '{"id":"login1","title":"Example","category":"LOGIN","vault":{"id":"v1"},"urls":[{"href":"https://example.com/login"}],"tags":["work"],"sections":[{"id":"sec1","label":"More"}],"fields":[{"id":"username","type":"STRING","purpose":"USERNAME","label":"username","value":"alice"},{"id":"password","type":"CONCEALED","purpose":"PASSWORD","label":"password","value":"pw"},{"id":"custom","type":"STRING","label":"Token","section":{"id":"sec1"},"value":"k"}]}\n{"id":"note1","title":"Note","category":"SECURE_NOTE","vault":{"id":"v1"},"fields":[]}\n'
+      printf '{"id":"login1","title":"Example","category":"LOGIN","vault":{"id":"v1"},"urls":[{"href":"https://example.com/login"}],"tags":["work"],"sections":[{"id":"sec1","label":"More"}],"fields":[{"id":"username","type":"STRING","purpose":"USERNAME","label":"username","value":"alice"},{"id":"password","type":"CONCEALED","purpose":"PASSWORD","label":"password","value":"pw"},{"id":"custom","type":"STRING","label":"Token","section":{"id":"sec1"},"value":"k"},{"id":"otp","type":"OTP","label":"one-time password","value":"otpauth://totp/Example?secret=SEED","totp":"123456"}]}\n{"id":"note1","title":"Note","category":"SECURE_NOTE","vault":{"id":"v1"},"fields":[]}\n'
       exit 0
       ;;
   esac
@@ -77,6 +77,9 @@ if [ "$1" = "item" ] && [ "$2" = "list" ]; then
     printf '[]\n'
   fi
   exit 0
+fi
+if [ "$1" = "item" ] && [ "$2" = "get" ]; then
+  for a in "$@"; do [ "$a" = "--otp" ] && { [ "$3" = "login1" ] && { printf '135790\n'; exit 0; } || exit 1; }; done
 fi
 if [ "$1" = "item" ] && [ "$2" = "get" ] && [ "$3" = "item123" ]; then
   # Real op: `op item get <id> --format=json` prints a single JSON OBJECT (one item), not an array.

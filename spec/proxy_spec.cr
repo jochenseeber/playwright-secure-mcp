@@ -211,6 +211,25 @@ Spectator.describe PlaywrightSecureMcp::Proxy do
     w[:client_in_w].close
   end
 
+  it "types a one-time password fetched live for an OTP field" do
+    w = wired
+    fake = FakeUpstream.new(w[:fake_transport])
+    fake.serve
+    spawn { build_proxy(w[:client_side], w[:upstream_side]).run }
+
+    call = %({"jsonrpc":"2.0","id":19,"method":"tools/call","params":{"name":"browser_type_secret","arguments":{"element":"One-time code","ref":"e1","vault":"v1","item":"login1","field":"otp"}}})
+    w[:driver].write(JSON.parse(call))
+    response = w[:driver].read || raise("no response")
+
+    # The upstream receives the live code from `op item get --otp`, and the
+    # echoed value is redacted because the code was registered as an
+    # expiring secret while being typed.
+    expect(fake.received_browser_type_text).to eq("135790")
+    expect(response["result"]["isError"].as_bool).to be_false
+    expect(response["result"]["content"].as_a.first["text"].as_s).to eq("typed «REDACTED»")
+    w[:client_in_w].close
+  end
+
   it "reveals the item on demand when it is not cached yet" do
     w = wired
     fake = FakeUpstream.new(w[:fake_transport])
@@ -237,6 +256,25 @@ Spectator.describe PlaywrightSecureMcp::Proxy do
     response = w[:driver].read || raise("no response")
 
     expect(response["result"]["isError"].as_bool).to be_true
+    expect(fake.received_browser_type_text.nil?).to be_true
+    w[:client_in_w].close
+  end
+
+  it "refuses to type an OTP when the current page is not in the item's URL set" do
+    w = wired
+    fake = FakeUpstream.new(w[:fake_transport], page_url: "https://evil.com/")
+    fake.serve
+    spawn { build_proxy(w[:client_side], w[:upstream_side]).run }
+
+    call = %({"jsonrpc":"2.0","id":20,"method":"tools/call","params":{"name":"browser_type_secret","arguments":{"element":"One-time code","ref":"e1","vault":"v1","item":"login1","field":"otp"}}})
+    w[:driver].write(JSON.parse(call))
+    response = w[:driver].read || raise("no response")
+
+    # The URL gate refuses before the OTP branch runs: the client sees the
+    # refusal, and the live code never reaches the upstream.
+    expect(response["result"]["isError"].as_bool).to be_true
+    text = response["result"]["content"].as_a.first["text"].as_s
+    expect(text.includes?("is not in this item's URL set")).to be_true
     expect(fake.received_browser_type_text.nil?).to be_true
     w[:client_in_w].close
   end
