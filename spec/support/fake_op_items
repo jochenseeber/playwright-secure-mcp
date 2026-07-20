@@ -5,7 +5,7 @@
 #   op item get - --reveal --format=json   (specifiers as JSON array on stdin)
 # TokenFetcher:
 #   op item list --tags <TAG> --format=json [--account X]
-#   op item get item123 --fields label=credential --reveal --format=json
+#   op item get item123 --reveal --format=json
 category=""
 login_tag=""
 account=""
@@ -79,7 +79,8 @@ if [ "$1" = "item" ] && [ "$2" = "list" ]; then
   exit 0
 fi
 if [ "$1" = "item" ] && [ "$2" = "get" ] && [ "$3" = "item123" ]; then
-  printf '[{"id":"credential","label":"credential","value":"ops_service_token","type":"CONCEALED"}]\n'
+  # Real op: `op item get <id> --format=json` prints a single JSON OBJECT (one item), not an array.
+  printf '{"id":"item123","title":"API Key","vault":{"id":"v1"},"fields":[{"id":"credential","label":"credential","value":"ops_service_token","type":"CONCEALED"}]}\n'
   exit 0
 fi
 exit 1

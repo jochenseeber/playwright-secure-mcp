@@ -34,8 +34,8 @@ module PlaywrightSecureMcp
     end
 
     private def credential(id : String) : String
-      fields = Array(OpField).from_json(run(["item", "get", id, "--fields", "label=credential", "--reveal", "--format=json"]))
-      field = fields.find { |candidate| candidate.label == "credential" || candidate.id == "credential" }
+      item = OpItem.from_json(run(["item", "get", id, "--reveal", "--format=json"]))
+      field = item.fields.find { |candidate| candidate.label == "credential" || candidate.id == "credential" }
       raise Error.new("no credential field on 1Password item #{id}") unless field
       value = field.value
       raise Error.new("credential field on 1Password item #{id} has no value") if value.nil?
