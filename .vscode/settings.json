@@ -62,6 +62,11 @@
         "https://schemastore.azurewebsites.net/": true,
         "https://www.schemastore.org/": true
     },
+    "markdownlint.config": {
+        "MD024": {
+            "siblings_only": true
+        }
+    },
     "markdownlint.ignore": [
         "**/.serena/**"
     ],

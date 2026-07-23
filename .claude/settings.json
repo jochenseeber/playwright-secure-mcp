@@ -1,69 +1,118 @@
 {
-  "enabledPlugins": {
-    "claude-code-setup@claude-plugins-official": true,
-    "claude-md-management@claude-plugins-official": true,
-    "code-simplifier@claude-plugins-official": true,
-    "context7@claude-plugins-official": true,
-    "ralph-loop@claude-plugins-official": true,
-    "serena@claude-plugins-official": true,
-    "superpowers@claude-plugins-official": true
-  },
-  "sandbox": {
-    "enabled": true,
-    "failIfUnavailable": true,
-    "allowUnsandboxedCommands": false,
-    "network": {
-      "allowedDomains": [
-      ],
-      "allowUnixSockets": [
-        "~/Library/Group Containers/2BUA8C4S2C.com.1password/t/agent.sock",
-        "~/Library/Group Containers/2BUA8C4S2C.com.1password/t/s.sock"
-      ],
-      "allowMachLookup": [
-        "2BUA8C4S2C.com.1password.*",
-        "com.1password.*",
-        "com.apple.CryptoTokenKit.*",
-        "com.apple.SecurityServer",
-        "com.apple.ctkd.*",
-        "com.apple.securityd.*",
-        "com.apple.trustd.*"
-      ]
+    "enabledPlugins": {
+        "claude-code-setup@claude-plugins-official": true,
+        "claude-md-management@claude-plugins-official": true,
+        "code-simplifier@claude-plugins-official": true,
+        "context7@claude-plugins-official": true,
+        "ralph-loop@claude-plugins-official": true,
+        "serena@claude-plugins-official": true,
+        "superpowers@claude-plugins-official": true
     },
-    "filesystem": {
-      "allowWrite": [
-        "~/.cache/crystal",
-        "~/.cache/rubocop_cache",
-        "~/.cache/uv",
-        "~/.local/share/uv",
-        "~/.serena"
-      ],
-      "denyRead": [
-        "~/",
-        "~/.claude/.credentials.json",
-        "~/.claude/history.jsonl",
-        "~/.claude/projects"
-      ],
-      "allowRead": [
-        ".",
-        "~/.cache/crystal",
-        "~/.cache/rubocop_cache",
-        "~/.cache/uv",
-        "~/.claude",
-        "~/.config/git",
-        "~/.config/op",
-        "~/.gitconfig",
-        "~/.gitignore_global",
-        "~/.local/bin",
-        "~/.local/share/uv",
-        "~/.local/state/fnm_multishells",
-        "~/.rbenv",
-        "~/.serena",
-        "~/CLAUDE.md",
-        "~/Library/Caches/dprint",
-        "~/Library/Group Containers/2BUA8C4S2C.com.1password",
-        "~/Library/Keychains"
-      ]
+    "hooks": {
+        "PreToolUse": [
+            {
+                "hooks": [
+                    {
+                        "command": "uvx --from git+https://github.com/oraios/serena -- serena-hooks remind --client=claude-code",
+                        "type": "command"
+                    }
+                ],
+                "matcher": ""
+            }
+        ],
+        "SessionEnd": [
+            {
+                "hooks": [
+                    {
+                        "command": "uvx --from git+https://github.com/oraios/serena -- serena-hooks cleanup --client=claude-code",
+                        "type": "command"
+                    }
+                ],
+                "matcher": ""
+            }
+        ],
+        "SessionStart": [
+            {
+                "hooks": [
+                    {
+                        "command": "uvx --from git+https://github.com/oraios/serena -- serena-hooks activate --client=claude-code",
+                        "type": "command"
+                    }
+                ],
+                "matcher": ""
+            }
+        ]
     },
-    "enableWeakerNetworkIsolation": true
-  }
+    "permissions": {
+        "allow": [
+            "mcp__plugin_context7_context7__query-docs",
+            "mcp__serena__activate_project",
+            "mcp__serena__initial_instructions"
+        ]
+    },
+    "sandbox": {
+        "allowUnsandboxedCommands": false,
+        "enableWeakerNetworkIsolation": true,
+        "enabled": true,
+        "failIfUnavailable": true,
+        "filesystem": {
+            "allowRead": [
+                ".",
+                "~/.cache/crystal",
+                "~/.cache/rubocop_cache",
+                "~/.cache/uv",
+                "~/.claude",
+                "~/.config/git",
+                "~/.config/op",
+                "~/.config/vsrun",
+                "~/.gitconfig",
+                "~/.gitignore_global",
+                "~/.local/bin",
+                "~/.local/share/uv",
+                "~/.local/state/fnm_multishells",
+                "~/.rbenv",
+                "~/.serena",
+                "~/CLAUDE.md",
+                "~/Library/Caches/dprint",
+                "~/Library/Group Containers/2BUA8C4S2C.com.1password",
+                "~/Library/Keychains"
+            ],
+            "allowWrite": [
+                "~/.cache/crystal",
+                "~/.cache/rubocop_cache",
+                "~/.cache/uv",
+                "~/.local/share/uv",
+                "~/.serena"
+            ],
+            "denyRead": [
+                "~/",
+                "~/.claude/.credentials.json",
+                "~/.claude/history.jsonl",
+                "~/.claude/projects"
+            ]
+        },
+        "network": {
+            "allowAllUnixSockets": true,
+            "allowMachLookup": [
+                "2BUA8C4S2C.com.1password.*",
+                "com.1password.*",
+                "com.apple.CryptoTokenKit.*",
+                "com.apple.SecurityServer",
+                "com.apple.ctkd.*",
+                "com.apple.securityd.*",
+                "com.apple.trustd.*"
+            ],
+            "allowUnixSockets": [
+                "~/Library/Group Containers/2BUA8C4S2C.com.1password/t/agent.sock",
+                "~/Library/Group Containers/2BUA8C4S2C.com.1password/t/s.sock"
+            ],
+            "allowedDomains": [
+                "codeload.github.com",
+                "files.pythonhosted.org",
+                "github.com",
+                "objects.githubusercontent.com",
+                "pypi.org"
+            ]
+        }
+    }
 }
