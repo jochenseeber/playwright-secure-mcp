@@ -122,7 +122,9 @@ jobs:
   build-linux-glibc:
     name: Build linux-${{ matrix.arch }}-glibc-dynamic
     runs-on: ${{ matrix.runner }}
-    needs: [crystal-version, ci]
+    # Build the Alpine (musl) profile first; only start the slower Debian/macOS
+    # builds once it succeeds, mirroring the CI test ordering to fail fast.
+    needs: [crystal-version, ci, build-linux-musl]
     container: crystallang/crystal:${{ needs.crystal-version.outputs.version }}
     strategy:
       fail-fast: false
@@ -171,7 +173,8 @@ jobs:
   build-macos:
     name: Build darwin-${{ matrix.arch }}-system-dynamic
     runs-on: ${{ matrix.runner }}
-    needs: [crystal-version, ci]
+    # Gated on the Alpine (musl) build for the same fail-fast reason as build-linux-glibc.
+    needs: [crystal-version, ci, build-linux-musl]
     strategy:
       fail-fast: false
       matrix:

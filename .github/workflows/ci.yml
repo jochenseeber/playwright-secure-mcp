@@ -79,7 +79,9 @@ jobs:
   test-linux-glibc:
     name: Test (Debian ${{ matrix.arch }})
     runs-on: ${{ matrix.runner }}
-    needs: [crystal-version, lint]
+    # Run the Alpine (musl) suite first; only start the slower Debian/macOS jobs
+    # once it passes, so a musl-specific failure fails fast and cheaply.
+    needs: [crystal-version, lint, test-linux]
     # The official Crystal image is Ubuntu-based (glibc); it reports
     # ID_LIKE=debian, matching shard.yml's `debian` OS. The Linux TpmCipher tier
     # links tss2 dynamically via the source's @[Link] annotations, so the dev
@@ -111,7 +113,8 @@ jobs:
   test-macos:
     name: Test (macOS ${{ matrix.arch }})
     runs-on: ${{ matrix.runner }}
-    needs: [crystal-version, lint]
+    # Gated on the Alpine suite for the same fail-fast reason as test-linux-glibc.
+    needs: [crystal-version, lint, test-linux]
     strategy:
       fail-fast: false
       matrix:
